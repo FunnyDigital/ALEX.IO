@@ -43,6 +43,11 @@ function Dashboard() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/');
+  };
+
   return (
     <Paper sx={{ p: 3, mt: 4 }}>
       <Typography variant="h6">Welcome, {profile.username}</Typography>
@@ -71,6 +76,9 @@ function Dashboard() {
       </Box>
       <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={() => navigate('/games')}>
         Play Games
+      </Button>
+      <Button fullWidth variant="outlined" sx={{ mt: 2 }} color="error" onClick={handleLogout}>
+        Logout
       </Button>
     </Paper>
   );
