@@ -23,14 +23,14 @@ app.get('/', (req, res) => {
 // Authentication routes
 app.use('/api/auth', require('./routes/auth'));
 
-// User profile and wallet routes
-app.use('/api/user', require('./routes/user'));
+// User profile and wallet routes (Firestore)
+app.use('/api/user', require('./routes/user_firestore'));
 
 // Basic games routes
-app.use('/api/games', require('./routes/games/basic'));
 
 // Advanced games routes
-app.use('/api/games', require('./routes/games/advanced'));
+// Firestore-based games routes
+app.use('/api/games', require('./routes/games/firestore'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

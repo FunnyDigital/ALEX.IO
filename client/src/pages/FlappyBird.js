@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Typography, Button, Paper, TextField } from '@mui/material';
-import axios from 'axios';
+import { auth, db } from '../firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 function FlappyBird() {
   const [bet, setBet] = useState('');
@@ -12,14 +13,29 @@ function FlappyBird() {
   const handlePlay = async () => {
     setError('');
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('/api/games/flappy-bird', { bet: Number(bet), score: Number(score) }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setResult(res.data.win ? 'Win' : 'Lose');
-      setWallet(res.data.wallet);
+      const user = auth.currentUser;
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      const currentWallet = userDoc.data().wallet || 0;
+      const betAmount = Number(bet);
+      const userScore = Number(score);
+      // Simple win/lose logic: win if score > 10
+      const win = userScore > 10;
+      let newWallet = currentWallet;
+      if (betAmount > 0 && betAmount <= currentWallet) {
+        if (win) {
+          newWallet += betAmount;
+        } else {
+          newWallet -= betAmount;
+        }
+        await updateDoc(userRef, { wallet: newWallet });
+        setResult(win ? 'Win' : 'Lose');
+        setWallet(newWallet);
+      } else {
+        setError('Invalid bet or insufficient balance');
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error');
+      setError('Error');
     }
   };
 

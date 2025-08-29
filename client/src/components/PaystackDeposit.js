@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { auth, db } from '../firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 
 const PaystackDeposit = ({ token, onDeposit }) => {
@@ -8,29 +9,25 @@ const PaystackDeposit = ({ token, onDeposit }) => {
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
 
-  // Get user email from profile API
+  // Get user email from Firebase Auth
   React.useEffect(() => {
-    const fetchEmail = async () => {
-      try {
-        const res = await axios.get('/api/user/profile', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setEmail(res.data.email);
-      } catch {}
-    };
-    fetchEmail();
-  }, [token]);
+    const user = auth.currentUser;
+    if (user) setEmail(user.email);
+  }, []);
 
   const handleVerifyPayment = async (reference, amount) => {
     try {
-      const res = await axios.post('/api/user/wallet/deposit', {
-        reference,
-        amount
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+      // Here you would verify with Paystack if needed
+      // For demo, just update wallet in Firestore
+      const user = auth.currentUser;
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      const currentWallet = userDoc.data().wallet || 0;
+      await updateDoc(userRef, {
+        wallet: currentWallet + amount
       });
       setMessage('Deposit successful!');
-      if (onDeposit) onDeposit(res.data.wallet);
+      if (onDeposit) onDeposit(currentWallet + amount);
     } catch (err) {
       setMessage('Deposit failed.');
     }
