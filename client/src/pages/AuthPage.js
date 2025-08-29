@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { TextField, Button, Typography, Paper } from '@mui/material';
-import axios from 'axios';
+import { auth, db } from '../firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 function AuthPage() {
@@ -17,13 +19,32 @@ function AuthPage() {
     e.preventDefault();
     setError('');
     try {
-      const url = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const payload = isLogin ? { email: form.email, password: form.password } : form;
-      const res = await axios.post(url, payload);
-      localStorage.setItem('token', res.data.token);
+      if (isLogin) {
+        const userCredential = await signInWithEmailAndPassword(auth, form.email, form.password);
+        // Ensure Firestore user document exists
+        const userRef = doc(db, 'users', userCredential.user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            username: '', // You can prompt for username later
+            email: form.email,
+            wallet: 0,
+            createdAt: new Date().toISOString()
+          });
+        }
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password);
+        // Save user profile to Firestore
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          username: form.username,
+          email: form.email,
+          wallet: 0,
+          createdAt: new Date().toISOString()
+        });
+      }
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error');
+      setError(err.message || 'Error');
     }
   };
 

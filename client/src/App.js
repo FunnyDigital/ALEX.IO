@@ -9,6 +9,7 @@ import CoinFlip from './pages/CoinFlip';
 import DiceRoll from './pages/DiceRoll';
 import TradeGamble from './pages/TradeGamble';
 import FlappyBird from './pages/FlappyBird';
+import Wallet from './pages/Wallet';
 
 function App() {
   return (
@@ -20,7 +21,8 @@ function App() {
         <Route path="/games/coin-flip" element={<CoinFlip />} />
         <Route path="/games/dice-roll" element={<DiceRoll />} />
         <Route path="/games/trade-gamble" element={<TradeGamble />} />
-        <Route path="/games/flappy-bird" element={<FlappyBird />} />
+  <Route path="/games/flappy-bird" element={<FlappyBird />} />
+  <Route path="/wallet" element={<Wallet />} />
       </Routes>
     </BrowserRouter>
   );

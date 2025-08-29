@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, Paper, TextField } from '@mui/material';
 import axios from 'axios';
+import { auth } from '../firebase';
 
 function CoinFlip() {
   const [bet, setBet] = useState('');
@@ -12,14 +13,16 @@ function CoinFlip() {
   const handlePlay = async () => {
     setError('');
     try {
-      const token = localStorage.getItem('token');
+      const user = auth.currentUser;
+      if (!user) throw new Error('User not authenticated');
+      const token = await user.getIdToken();
       const res = await axios.post('/api/games/coin-flip', { bet: Number(bet), choice }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setResult(res.data.result);
       setWallet(res.data.wallet);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error');
+      setError(err.response?.data?.message || err.message || 'Error');
     }
   };
 
