@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, Paper, TextField } from '@mui/material';
+import { Box, Typography, Button, Paper, TextField, LinearProgress } from '@mui/material';
 import axios from 'axios';
 import { auth } from '../firebase';
 
@@ -9,14 +9,16 @@ function CoinFlip() {
   const [result, setResult] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handlePlay = async () => {
     setError('');
+    setLoading(true);
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('User not authenticated');
       const token = await user.getIdToken();
-      const res = await axios.post('/api/games/coin-flip', { bet: Number(bet), choice }, {
+  const res = await axios.post('https://api-v2ckmk5jla-uc.a.run.app/api/games/coin-flip', { bet: Number(bet), choice }, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setResult(res.data.result);
@@ -24,6 +26,7 @@ function CoinFlip() {
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Error');
     }
+    setLoading(false);
   };
 
   return (
@@ -34,7 +37,8 @@ function CoinFlip() {
         <Button variant={choice === 'heads' ? 'contained' : 'outlined'} onClick={() => setChoice('heads')}>Heads</Button>
         <Button variant={choice === 'tails' ? 'contained' : 'outlined'} onClick={() => setChoice('tails')}>Tails</Button>
       </Box>
-      <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={handlePlay}>Play</Button>
+  <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={handlePlay} disabled={loading}>Play</Button>
+  {loading && <LinearProgress sx={{ mt: 2 }} />}
       {result && <Typography sx={{ mt: 2 }}>Result: {result}</Typography>}
       {wallet !== null && <Typography>Wallet: ${wallet}</Typography>}
       {error && <Typography color="error">{error}</Typography>}

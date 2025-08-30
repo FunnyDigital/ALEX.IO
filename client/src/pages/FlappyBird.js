@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Button, Paper, TextField } from '@mui/material';
+import { Typography, Button, Paper, TextField, LinearProgress } from '@mui/material';
 import { auth, db } from '../firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -9,9 +9,11 @@ function FlappyBird() {
   const [result, setResult] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handlePlay = async () => {
     setError('');
+    setLoading(true);
     try {
       const user = auth.currentUser;
       const userRef = doc(db, 'users', user.uid);
@@ -37,6 +39,7 @@ function FlappyBird() {
     } catch (err) {
       setError('Error');
     }
+    setLoading(false);
   };
 
   return (
@@ -44,7 +47,8 @@ function FlappyBird() {
       <Typography variant="h6">Flappy Bird</Typography>
       <TextField label="Bet Amount" type="number" value={bet} onChange={e => setBet(e.target.value)} fullWidth sx={{ mt: 2 }} />
       <TextField label="Score" type="number" value={score} onChange={e => setScore(e.target.value)} fullWidth sx={{ mt: 2 }} />
-      <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={handlePlay}>Play</Button>
+  <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={handlePlay} disabled={loading}>Play</Button>
+  {loading && <LinearProgress sx={{ mt: 2 }} />}
       {result && <Typography sx={{ mt: 2 }}>Result: {result}</Typography>}
       {wallet !== null && <Typography>Wallet: ${wallet}</Typography>}
       {error && <Typography color="error">{error}</Typography>}
