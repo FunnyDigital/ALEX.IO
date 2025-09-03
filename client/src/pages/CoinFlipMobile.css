@@ -1,0 +1,67 @@
+/* Mobile-friendly styles for CoinFlip */
+.coinflip-mobile-bg {
+  background: #181a2a;
+}
+.coinflip-mobile-card {
+  box-sizing: border-box;
+  background: #23243a;
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  padding: 1.5rem 1rem;
+  max-width: 400px;
+  width: 100%;
+  margin: auto;
+}
+.app-header {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 2rem;
+  font-weight: bold;
+  text-align: center;
+  color: #facc15;
+  margin-bottom: 1rem;
+}
+.app-section-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1.1rem;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+.coinflip-coin-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+.coinflip-coin {
+  transition: transform 1.2s cubic-bezier(.68,-0.55,.27,1.55);
+  will-change: transform;
+}
+.coinflip-coin.flipping {
+  transform: rotateY(720deg) scale(1.1);
+}
+.coinflip-coin.heads {
+  box-shadow: 0 0 24px #facc15;
+}
+.coinflip-coin.tails {
+  box-shadow: 0 0 24px #22c55e;
+}
+.coinflip-result {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1.3rem;
+  text-align: center;
+  margin-top: 1rem;
+}
+@media (max-width: 500px) {
+  .coinflip-mobile-card {
+    padding: 1rem 0.5rem;
+    max-width: 95vw;
+  }
+  .app-header {
+    font-size: 1.2rem;
+  }
+  .app-section-title {
+    font-size: 0.9rem;
+  }
+}
