@@ -1,28 +1,31 @@
 import React from 'react';
-import { Typography, Button, Paper } from '@mui/material';
+import { Typography, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import './GamesMobile.css';
 
 function Games() {
   const navigate = useNavigate();
   return (
-    <Paper sx={{ p: 3, mt: 4 }}>
-      <Typography variant="h6" align="center">Choose a Game</Typography>
-  <Button fullWidth variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/games/coin-flip')}>
-        Coin Flip
-      </Button>
-  <Button fullWidth variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/games/dice-roll')}>
-        Dice Roll
-      </Button>
-  <Button fullWidth variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/games/trade-gamble')}>
-        Trade Gamble
-      </Button>
-  <Button fullWidth variant="outlined" sx={{ mt: 2 }} onClick={() => navigate('/games/flappy-bird')}>
-        Flappy Bird
-      </Button>
-      <Button fullWidth sx={{ mt: 2 }} onClick={() => navigate('/dashboard')}>
-        Back to Dashboard
-      </Button>
-    </Paper>
+    <div className="games-root">
+      <div className="games-box">
+        <Typography className="games-title">Choose a Game</Typography>
+        <Button fullWidth className="games-btn" onClick={() => navigate('/games/coin-flip')}>
+          Coin Flip
+        </Button>
+        <Button fullWidth className="games-btn" onClick={() => navigate('/games/dice-roll')}>
+          Dice Roll
+        </Button>
+        <Button fullWidth className="games-btn" onClick={() => navigate('/games/trade-gamble')}>
+          Trade Gamble
+        </Button>
+        <Button fullWidth className="games-btn" onClick={() => navigate('/games/flappy-bird')}>
+          Flappy Bird
+        </Button>
+        <Button fullWidth className="games-btn back" onClick={() => navigate('/dashboard')}>
+          Back to Dashboard
+        </Button>
+      </div>
+    </div>
   );
 }
 

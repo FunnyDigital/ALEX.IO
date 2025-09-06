@@ -1,0 +1,107 @@
+/* Dashboard Mobile & Pixel-Art Styles */
+.dashboard-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e94f4f 0%, #ff7c7c 100%);
+  transition: background 0.5s;
+}
+.dashboard-box {
+  background: #fff;
+  border-radius: 32px;
+  box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
+  padding: 2.5rem 2rem;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+  border: 4px solid #222;
+  image-rendering: pixelated;
+}
+.dashboard-title {
+  font-family: 'Press Start 2P', monospace;
+  color: #e94f4f;
+  letter-spacing: 2px;
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+  font-size: 2rem;
+}
+.dashboard-email {
+  font-family: 'Press Start 2P', monospace;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+.dashboard-divider {
+  margin-bottom: 2rem;
+  background: #e94f4f;
+  height: 2px;
+  border-radius: 2px;
+}
+.dashboard-wallet-label {
+  font-family: 'Press Start 2P', monospace;
+  font-weight: 700;
+  color: #e94f4f;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+.dashboard-wallet {
+  font-family: 'Press Start 2P', monospace;
+  font-weight: 900;
+  color: #e94f4f;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+}
+.dashboard-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-weight: 900;
+  font-size: 1.1rem;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  margin-bottom: 1.5rem;
+  padding: 1rem 0;
+  image-rendering: pixelated;
+}
+.dashboard-btn.wallet {
+  background-color: #e94f4f;
+  color: #fff;
+}
+.dashboard-btn.wallet:hover {
+  background-color: #ff7c7c;
+}
+.dashboard-btn.games {
+  background-color: #4f6ee9;
+  color: #fff;
+}
+.dashboard-btn.games:hover {
+  background-color: #7cbcff;
+}
+.dashboard-btn.logout {
+  color: #e94f4f;
+  border: 2px solid #e94f4f;
+  background: #fff;
+}
+.dashboard-btn.logout:hover {
+  background: #ffeaea;
+}
+@media (max-width: 600px) {
+  .dashboard-box {
+    max-width: 95vw;
+    padding: 1.5rem 0.5rem;
+    border-radius: 16px;
+  }
+  .dashboard-title {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+  .dashboard-wallet {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+  .dashboard-btn {
+    font-size: 0.9rem;
+    padding: 0.7rem 0;
+  }
+}
