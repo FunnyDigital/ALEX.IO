@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AuthPage from './pages/AuthPage';
 import Games from './pages/Games';
@@ -13,6 +12,9 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import './pages/GamesMobile.css';
+
+export const BalanceContext = createContext({ balance: null, setBalance: () => {} });
 
 function AppShell() {
   const [balance, setBalance] = useState(null);
@@ -44,20 +46,22 @@ function AppShell() {
       background: 'var(--primary-bg)',
       color: 'var(--text-primary)'
     }}>
-      <Header balance={balance !== null ? balance.toLocaleString() : '...'} onDeposit={handleDeposit} />
-      <main style={{ flex: 1 }}>
-        <Routes>
-          <Route path="/" element={<AuthPage />} />
-          <Route path="/games" element={<Games />} />
-          <Route path="/games/coin-flip" element={<CoinFlip />} />
-          <Route path="/games/dice-roll" element={<DiceRoll />} />
-          <Route path="/games/trade-gamble" element={<TradeGamble />} />
-          <Route path="/games/flappy-bird" element={<FlappyBirdGame />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-      </main>
-      <Footer />
+      <BalanceContext.Provider value={{ balance, setBalance }}>
+        <Header balance={balance !== null ? balance.toLocaleString() : '...'} onDeposit={handleDeposit} />
+        <main style={{ flex: 1 }}>
+          <Routes>
+            <Route path="/" element={<AuthPage />} />
+            <Route path="/games" element={<Games />} />
+            <Route path="/games/coin-flip" element={<CoinFlip />} />
+            <Route path="/games/dice-roll" element={<DiceRoll />} />
+            <Route path="/games/trade-gamble" element={<TradeGamble />} />
+            <Route path="/games/flappy-bird" element={<FlappyBirdGame />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+        </main>
+        <Footer />
+      </BalanceContext.Provider>
     </div>
   );
 }

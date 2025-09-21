@@ -1,6 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useContext } from 'react';
 import { auth, db } from '../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import axios from 'axios';
+import { BalanceContext } from '../App';
 
 const TIME_OPTIONS = Array.from({ length: 10 }, (_, i) => 15 + i * 5); // 15, 20, ..., 60
 
@@ -216,6 +218,7 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
 }
 
 function FlappyBirdGame() {
+    const { setBalance } = useContext(BalanceContext);
     const [gameState, setGameState] = useState('setup'); // 'setup', 'playing', 'gameOver'
     const [targetTime, setTargetTime] = useState(30);
     const [wager, setWager] = useState(100);
@@ -250,19 +253,21 @@ function FlappyBirdGame() {
     const handleGameOver = async (win, time) => {
         setResult({ win, time });
         setGameState('gameOver');
-        // Update wallet in Firestore
+        // Settle via server to ensure single source of truth
         const user = auth.currentUser;
         if (user) {
-            const userRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userRef);
-            let newWallet = userDoc.data().wallet || 0;
-            if (win) {
-                newWallet += wager;
-            } else {
-                newWallet -= wager;
+            const token = await user.getIdToken();
+            try {
+                const res = await axios.post('/api/games/flappy-bird', {
+                    bet: Number(wager),
+                    score: Number(time)
+                }, { headers: { Authorization: `Bearer ${token}` } });
+                const { wallet: newWallet } = res.data || {};
+                if (typeof newWallet === 'number') { setWallet(newWallet); setBalance?.(newWallet); }
+            } catch (e) {
+                // best-effort; UI already shows result
+                console.error('Settle error', e);
             }
-            await updateDoc(userRef, { wallet: newWallet });
-            setWallet(newWallet);
         }
     };
 

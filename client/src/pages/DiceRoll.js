@@ -3,7 +3,11 @@ import { Box, Typography, Button, TextField, LinearProgress } from '@mui/materia
 import axios from 'axios';
 import { auth } from '../firebase';
 
+import { useContext } from 'react';
+import { BalanceContext } from '../App';
+
 function DiceRoll() {
+  const { setBalance } = useContext(BalanceContext);
   const [bet, setBet] = useState('');
   const [guess, setGuess] = useState(1);
   const [result, setResult] = useState(null);
@@ -31,15 +35,21 @@ function DiceRoll() {
       // Simulate dice roll animation
       setTimeout(async () => {
         try {
-          const res = await axios.post('/api/games/dice-roll', { 
-            bet: Number(bet), 
-            guess: Number(guess) 
+          const res = await axios.post('/api/games/dice-roll', {
+            bet: Number(bet),
+            guess: Number(guess)
           }, {
             headers: { Authorization: `Bearer ${token}` },
           });
           
-          setResult(res.data.result);
-          setWallet(res.data.wallet);
+          const { result, wallet: newWallet } = res.data || {};
+          if (typeof newWallet === 'number') {
+            setResult(result);
+            setWallet(newWallet);
+            setBalance?.(newWallet);
+          } else {
+            setError(res.data?.message || 'Unexpected server response');
+          }
           setRolling(false);
         } catch (err) {
           setError(err.response?.data?.message || err.message || 'Error');
