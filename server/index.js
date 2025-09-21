@@ -15,8 +15,8 @@ app.get('/', (req, res) => {
   res.send('API is running');
 });
 
-// Authentication routes
-app.use('/api/auth', require('./routes/auth'));
+// Authentication routes - temporarily commented out due to mongoose dependency
+// app.use('/api/auth', require('./routes/auth'));
 
 // User profile and wallet routes (Firestore)
 app.use('/api/user', require('./routes/user_firestore'));
