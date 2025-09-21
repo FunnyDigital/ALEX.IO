@@ -32,6 +32,9 @@ const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
+// Load environment variables for local development
+require('dotenv').config();
+
 admin.initializeApp();
 
 const app = express();
