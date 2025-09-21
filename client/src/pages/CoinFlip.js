@@ -1,12 +1,10 @@
-import React, { useState, useContext } from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, Button, TextField, LinearProgress, Snackbar, Alert } from '@mui/material';
 import axios from 'axios';
 import { auth } from '../firebase';
 import coinImg from '../assets/bitcoin.png';
-import { BalanceContext } from '../App';
 
 function CoinFlip() {
-  const { setBalance } = useContext(BalanceContext);
   const [bet, setBet] = useState('');
   const [choice, setChoice] = useState('heads');
   const [result, setResult] = useState(null);
@@ -43,45 +41,57 @@ function CoinFlip() {
     setResult(null);
 
     try {
+      // Simulate coin flip
+      setTimeout(() => {
+        const coinResult = Math.random() < 0.5 ? 'heads' : 'tails';
+        handlePlay(coinResult);
+      }, 1000);
+    } catch (err) {
+      setError('Failed to flip coin');
+      setLoading(false);
+      setSpinning(false);
+    }
+  };
+
+  const handlePlay = async (apiResult) => {
+    try {
       const user = auth.currentUser;
       if (!user) throw new Error('Not authenticated');
       
       const token = await user.getIdToken();
-      const res = await axios.post(`/api/games/coin-flip`, {
-        bet: parseFloat(bet),
-        choice
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await axios.post(`/api/games/coinflip`, { 
+        bet: parseFloat(bet), 
+        choice 
+      }, { 
+        headers: { Authorization: `Bearer ${token}` } 
       });
 
-      const { result: serverResult, win, wallet: newWallet, message } = res.data || {};
-      if (typeof newWallet !== 'number') {
-        setError(message || 'Unexpected server response');
-      } else {
-        setWallet(newWallet);
-        setBalance?.(newWallet);
+      if (res.data.success) {
+        setWallet(res.data.wallet);
         setHistory([
-          {
-            time: new Date().toLocaleTimeString(),
-            choice,
-            result: serverResult,
-            win,
-            wallet: newWallet
-          },
+          { 
+            time: new Date().toLocaleTimeString(), 
+            choice, 
+            result: apiResult, 
+            win: choice === apiResult, 
+            wallet: res.data.wallet 
+          }, 
           ...history.slice(0, 4)
         ]);
-        // show the server's result
-        setTimeout(() => setResult(serverResult), 300);
+      } else {
+        setError(res.data.message);
       }
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Error');
-    } finally {
-      setLoading(false);
-      setTimeout(() => {
-        setSpinning(false);
-        setShowSnackbar(true);
-      }, 800);
     }
+
+    setLoading(false);
+    // Keep spinning for at least 1.2s, then show result
+    setTimeout(() => {
+      setResult(apiResult);
+      setSpinning(false);
+      setShowSnackbar(true);
+    }, 1200);
   };
 
   return (
