@@ -1,12 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, Paper, TextField, LinearProgress, Snackbar, Alert, Divider } from '@mui/material';
+import { Box, Typography, Button, TextField, LinearProgress, Snackbar, Alert } from '@mui/material';
 import axios from 'axios';
 import { auth } from '../firebase';
-
-import CoinHeadsSVG from '../assets/coin-heads';
-import CoinTailsSVG from '../assets/coin-tails';
-import coinImg from '../assets/bitcoin.png'; // Use the bitcoin image for the coin flip
-import './CoinFlipMobile.css';
+import coinImg from '../assets/bitcoin.png';
 
 function CoinFlip() {
   const [bet, setBet] = useState('');
@@ -19,10 +15,6 @@ function CoinFlip() {
   const [history, setHistory] = useState([]);
   const [showSnackbar, setShowSnackbar] = useState(false);
 
-  // Add coin flip animation state
-  const [flipping, setFlipping] = useState(false);
-  const [flipResult, setFlipResult] = useState(null);
-
   // Coin image component
   const CoinImage = (
     <img
@@ -33,55 +25,68 @@ function CoinFlip() {
         height: '100%',
         objectFit: 'contain',
         borderRadius: '50%',
-        boxShadow: result === 'heads' ? '0 0 24px #facc15' : '0 0 24px #22c55e',
       }}
     />
   );
 
-  // Coin flip animation handler
   const handleFlip = async () => {
-    setFlipping(true);
-    setFlipResult(null);
-    // Simulate flip animation
-    setTimeout(() => {
-      const result = Math.random() < 0.5 ? 'heads' : 'tails';
-      setFlipResult(result);
-      setFlipping(false);
-      // Start spinning, request API
-      handlePlay(result);
-    }, 1200);
+    if (!bet || isNaN(bet) || bet <= 0) {
+      setError('Please enter a valid bet amount');
+      return;
+    }
+
+    setSpinning(true);
+    setLoading(true);
+    setError('');
+    setResult(null);
+
+    try {
+      // Simulate coin flip
+      setTimeout(() => {
+        const coinResult = Math.random() < 0.5 ? 'heads' : 'tails';
+        handlePlay(coinResult);
+      }, 1000);
+    } catch (err) {
+      setError('Failed to flip coin');
+      setLoading(false);
+      setSpinning(false);
+    }
   };
 
-  const handlePlay = async (flipResult) => {
-    setError('');
-    setLoading(true);
-    setSpinning(true);
-    let apiResult = null;
+  const handlePlay = async (apiResult) => {
     try {
       const user = auth.currentUser;
-      if (!user) throw new Error('User not authenticated');
+      if (!user) throw new Error('Not authenticated');
+      
       const token = await user.getIdToken();
-      // Start spinning, request API
-      const res = await axios.post('https://api-v2ckmk5jla-uc.a.run.app/api/games/coin-flip', { bet: Number(bet), choice }, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await axios.post(`/api/games/coinflip`, { 
+        bet: parseFloat(bet), 
+        choice 
+      }, { 
+        headers: { Authorization: `Bearer ${token}` } 
       });
-      apiResult = res.data.result;
-      setWallet(res.data.wallet);
-      setHistory(prev => [
-        {
-          time: new Date().toLocaleTimeString(),
-          choice,
-          result: res.data.result,
-          win: choice === res.data.result,
-          wallet: res.data.wallet,
-        },
-        ...prev.slice(0, 9)
-      ]);
+
+      if (res.data.success) {
+        setWallet(res.data.wallet);
+        setHistory([
+          { 
+            time: new Date().toLocaleTimeString(), 
+            choice, 
+            result: apiResult, 
+            win: choice === apiResult, 
+            wallet: res.data.wallet 
+          }, 
+          ...history.slice(0, 4)
+        ]);
+      } else {
+        setError(res.data.message);
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Error');
     }
+
     setLoading(false);
-    // Keep spinning for at least 1.2s after API result, then show result
+    // Keep spinning for at least 1.2s, then show result
     setTimeout(() => {
       setResult(apiResult);
       setSpinning(false);
@@ -90,68 +95,230 @@ function CoinFlip() {
   };
 
   return (
-    <div className="coinflip-mobile-bg min-h-screen flex items-center justify-center px-2 py-4">
-      <div className="coinflip-mobile-card w-full max-w-[400px] rounded-2xl shadow-2xl border-4 border-[#23243a] bg-[#23243a] p-4 mx-auto">
-        <div className="app-header text-yellow-400 text-center text-2xl font-bold mb-4">Coin Flip</div>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ mb: 2 }}>
-            {/* Coin animation */}
-            <Box
-              className={`coinflip-coin${spinning ? ' flipping' : ''} ${result ? result : ''}`}
-              sx={{
-                width: { xs: 100, sm: 120 },
-                height: { xs: 100, sm: 120 },
-                position: 'relative',
-                mb: 1,
-                transition: 'transform 1.2s cubic-bezier(.68,-0.55,.27,1.55)',
-                transform: spinning ? 'rotateY(720deg) scale(1.1)' : result === 'heads' ? 'rotateY(0deg)' : 'rotateY(180deg)',
-                mx: 'auto',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                background: '#23243a',
-              }}
+    <div className="gaming-page">
+      <div className="gaming-container">
+        <div className="gaming-card" style={{
+          width: '100%',
+          maxWidth: 400,
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 20
+        }}>
+          <div style={{
+            color: 'var(--text-gold)',
+            textAlign: 'center',
+            fontSize: 28,
+            fontWeight: 700,
+            margin: 0
+          }}>
+            Coin Flip Challenge
+          </div>
+          
+          {/* Coin animation */}
+          <Box
+            sx={{
+              width: { xs: 100, sm: 120 },
+              height: { xs: 100, sm: 120 },
+              position: 'relative',
+              mb: 2,
+              transition: 'transform 1.2s cubic-bezier(.68,-0.55,.27,1.55)',
+              transform: spinning ? 'rotateY(720deg) scale(1.1)' : result === 'heads' ? 'rotateY(0deg)' : 'rotateY(180deg)',
+              mx: 'auto',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              background: 'var(--accent-bg)',
+              border: '2px solid var(--border-primary)',
+              boxShadow: 'var(--shadow-primary)',
+            }}
+          >
+            {CoinImage}
+          </Box>
+          
+          <TextField 
+            label="Bet Amount" 
+            type="number" 
+            value={bet} 
+            onChange={e => setBet(e.target.value)} 
+            fullWidth 
+            InputProps={{ 
+              style: { 
+                color: 'var(--text-primary)', 
+                fontWeight: 600, 
+                background: 'var(--accent-bg)', 
+                borderRadius: 8 
+              } 
+            }}
+            InputLabelProps={{
+              style: { 
+                color: 'var(--text-secondary)'
+              }
+            }}
+            sx={{
+              mb: 2,
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'var(--border-secondary)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'var(--border-primary)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'var(--border-primary)',
+                },
+              },
+            }}
+          />
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 2, width: '100%' }}>
+            <Button 
+              variant={choice === 'heads' ? 'contained' : 'outlined'} 
+              sx={{ 
+                flex: 1,
+                bgcolor: choice === 'heads' ? 'var(--gold-primary)' : 'transparent', 
+                color: choice === 'heads' ? 'var(--primary-bg)' : 'var(--text-gold)', 
+                fontWeight: 700, 
+                borderRadius: 2,
+                border: choice === 'heads' ? 'none' : '2px solid var(--border-primary)',
+                '&:hover': {
+                  bgcolor: choice === 'heads' ? 'var(--gold-secondary)' : 'var(--accent-bg)',
+                }
+              }} 
+              onClick={() => setChoice('heads')}
             >
-              {CoinImage}
-            </Box>
+              Heads
+            </Button>
+            <Button 
+              variant={choice === 'tails' ? 'contained' : 'outlined'} 
+              sx={{ 
+                flex: 1,
+                bgcolor: choice === 'tails' ? 'var(--gold-primary)' : 'transparent', 
+                color: choice === 'tails' ? 'var(--primary-bg)' : 'var(--text-gold)', 
+                fontWeight: 700, 
+                borderRadius: 2,
+                border: choice === 'tails' ? 'none' : '2px solid var(--border-primary)',
+                '&:hover': {
+                  bgcolor: choice === 'tails' ? 'var(--gold-secondary)' : 'var(--accent-bg)',
+                }
+              }} 
+              onClick={() => setChoice('tails')}
+            >
+              Tails
+            </Button>
           </Box>
-          <TextField label="Bet Amount" type="number" value={bet} onChange={e => setBet(e.target.value)} fullWidth sx={{ mb: 2 }} InputProps={{ style: { color: '#ffd700', fontWeight: 600, background: '#23243a', borderRadius: 8 } }} />
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 2 }}>
-            <Button variant={choice === 'heads' ? 'contained' : 'outlined'} sx={{ bgcolor: choice === 'heads' ? '#ffd700' : '#23243a', color: choice === 'heads' ? '#23243a' : '#ffd700', fontWeight: 700, borderRadius: 8 }} onClick={() => setChoice('heads')}>Heads</Button>
-            <Button variant={choice === 'tails' ? 'contained' : 'outlined'} sx={{ bgcolor: choice === 'tails' ? '#ffd700' : '#23243a', color: choice === 'tails' ? '#23243a' : '#ffd700', fontWeight: 700, borderRadius: 8 }} onClick={() => setChoice('tails')}>Tails</Button>
-          </Box>
-          <Button fullWidth variant="contained" size="large" sx={{ mb: 2, fontWeight: 600, bgcolor: '#ffd700', color: '#23243a', borderRadius: 8 }} onClick={handleFlip} disabled={loading || spinning || !bet}>Play</Button>
-          {loading && (
-            <div className="app-progress-bar" style={{ width: '100%', marginBottom: '16px' }}>
-              <div className="app-progress-bar-inner" style={{ width: '100%' }}></div>
-            </div>
-          )}
-          {result && !loading && (
-            <Typography sx={{ mt: 1, fontSize: 18, fontWeight: 700, color: choice === result ? '#ffd700' : '#ff4d4f', textShadow: '0 2px 8px #23243a' }}>
-              {choice === result ? 'You Win!' : 'You Lose!'} Result: {result.charAt(0).toUpperCase() + result.slice(1)}
+          
+          <Button 
+            disabled={!bet || loading || spinning} 
+            onClick={handleFlip} 
+            variant="contained"
+            className="gaming-button-primary"
+            sx={{ 
+              width: '100%',
+              mb: 2,
+              background: 'var(--gradient-gold)',
+              color: 'var(--primary-bg)',
+              fontWeight: 700,
+              fontSize: 16,
+              borderRadius: 2,
+              padding: '12px 0',
+              boxShadow: 'var(--shadow-primary)',
+              '&:disabled': {
+                background: 'var(--accent-bg)',
+                color: 'var(--text-muted)',
+              }
+            }}
+          >
+            {loading || spinning ? 'Flipping...' : 'Flip Coin'}
+          </Button>
+          
+          {error && (
+            <Typography style={{ color: 'var(--red-accent)', textAlign: 'center', fontWeight: 600 }}>
+              {error}
             </Typography>
           )}
-          {wallet !== null && <Typography sx={{ mt: 1, color: '#ffd700', fontWeight: 600 }}>Wallet: ${wallet}</Typography>}
-          {error && <Alert severity="error" sx={{ mt: 2, borderRadius: 2, bgcolor: '#23243a', color: '#ffd700', fontWeight: 600 }}>{error}</Alert>}
-        </Box>
-        <Divider sx={{ my: 2, bgcolor: '#ffd700', height: 2, borderRadius: 2 }} />
-        <div className="app-section-title text-white text-center mt-4 mb-2">History</div>
-        <Box sx={{ maxHeight: 120, overflowY: 'auto', mb: 1 }}>
-          {history.length === 0 && <Typography color="#888">No flips yet.</Typography>}
-          {history.map((h, idx) => (
-            <Box key={idx} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 0.5, px: 1, borderRadius: 2, bgcolor: h.win ? '#23243a' : '#181a2a', mb: 0.5, boxShadow: h.win ? '0 2px 8px #ffd700' : '0 2px 8px #ff4d4f' }}>
-              <Typography sx={{ fontWeight: 500, color: '#ffd700' }}>{h.time}</Typography>
-              <Typography sx={{ color: '#ffd700' }}>{h.choice.charAt(0).toUpperCase() + h.choice.slice(1)}</Typography>
-              <Typography sx={{ color: '#ffd700' }}>{h.result.charAt(0).toUpperCase() + h.result.slice(1)}</Typography>
-              <Typography sx={{ color: h.win ? '#ffd700' : '#ff4d4f', fontWeight: 700 }}>{h.win ? 'Win' : 'Lose'}</Typography>
-              <Typography sx={{ fontSize: 13, color: '#ffd700' }}>Wallet: ${h.wallet}</Typography>
-            </Box>
-          ))}
-        </Box>
-        <Snackbar open={showSnackbar} autoHideDuration={2000} onClose={() => setShowSnackbar(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-          <Alert severity={choice === result ? 'success' : 'error'} sx={{ width: '100%' }}>
-            {choice === result ? 'Congratulations! You won the flip.' : 'Sorry, you lost the flip.'}
-          </Alert>
-        </Snackbar>
+          
+          {loading && <LinearProgress sx={{ width: '100%', mt: 1 }} />}
+          
+          {wallet !== null && (
+            <Typography style={{ color: 'var(--text-gold)', fontWeight: 600, fontSize: 18 }}>
+              Wallet: ${wallet}
+            </Typography>
+          )}
+          
+          {/* Game History */}
+          <Box sx={{ 
+            width: '100%', 
+            mt: 2, 
+            background: 'var(--accent-bg)', 
+            borderRadius: 2, 
+            border: '1px solid var(--border-secondary)',
+            maxHeight: 200, 
+            overflowY: 'auto',
+            padding: 1
+          }}>
+            <Typography sx={{ 
+              color: 'var(--text-primary)', 
+              fontWeight: 600, 
+              mb: 1, 
+              textAlign: 'center' 
+            }}>
+              Recent Games
+            </Typography>
+            {history.length === 0 && (
+              <Typography sx={{ color: 'var(--text-muted)', textAlign: 'center', py: 2 }}>
+                No games yet
+              </Typography>
+            )}
+            {history.map((h, idx) => (
+              <Box key={idx} sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between', 
+                py: 0.5, 
+                px: 1, 
+                borderRadius: 1, 
+                bgcolor: h.win ? 'var(--accent-bg)' : 'var(--secondary-bg)', 
+                mb: 0.5, 
+                border: h.win ? '1px solid var(--green-accent)' : '1px solid var(--red-accent)'
+              }}>
+                <Typography sx={{ fontWeight: 500, color: 'var(--text-secondary)', fontSize: 12 }}>
+                  {h.time}
+                </Typography>
+                <Typography sx={{ color: 'var(--text-primary)', fontSize: 13 }}>
+                  {h.choice.charAt(0).toUpperCase() + h.choice.slice(1)}
+                </Typography>
+                <Typography sx={{ color: 'var(--text-primary)', fontSize: 13 }}>
+                  {h.result.charAt(0).toUpperCase() + h.result.slice(1)}
+                </Typography>
+                <Typography sx={{ 
+                  color: h.win ? 'var(--green-accent)' : 'var(--red-accent)', 
+                  fontWeight: 700, 
+                  fontSize: 13 
+                }}>
+                  {h.win ? 'Win' : 'Lose'}
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: 'var(--text-gold)' }}>
+                  ${h.wallet}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+          
+          <Snackbar 
+            open={showSnackbar} 
+            autoHideDuration={2000} 
+            onClose={() => setShowSnackbar(false)} 
+            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          >
+            <Alert 
+              severity={choice === result ? 'success' : 'error'} 
+              sx={{ width: '100%' }}
+            >
+              {choice === result ? 'Congratulations! You won the flip.' : 'Sorry, you lost the flip.'}
+            </Alert>
+          </Snackbar>
+        </div>
       </div>
     </div>
   );

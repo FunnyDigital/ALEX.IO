@@ -1,107 +1,117 @@
-/* Dashboard Mobile & Pixel-Art Styles */
+/* Dashboard Modern Styles */
 .dashboard-root {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e94f4f 0%, #ff7c7c 100%);
-  transition: background 0.5s;
+  background-color: #121212;
+  padding: 1rem;
 }
+
 .dashboard-box {
-  background: #fff;
-  border-radius: 32px;
-  box-shadow: 0 8px 32px 0 rgba(31,38,135,0.37);
-  padding: 2.5rem 2rem;
-  max-width: 400px;
+  background-color: #1E1E1E;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 215, 0, 0.2);
+  padding: 2.5rem;
+  max-width: 450px;
   width: 100%;
   text-align: center;
-  position: relative;
-  border: 4px solid #222;
-  image-rendering: pixelated;
+  border: 1px solid #333;
 }
+
 .dashboard-title {
-  font-family: 'Press Start 2P', monospace;
-  color: #e94f4f;
-  letter-spacing: 2px;
-  margin-bottom: 2rem;
-  text-transform: uppercase;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  color: #FFD700;
+  letter-spacing: 1px;
+  margin-bottom: 1rem;
   font-size: 2rem;
 }
+
 .dashboard-email {
-  font-family: 'Press Start 2P', monospace;
-  font-weight: 700;
-  color: #333;
-  margin-bottom: 1rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  color: #aaa;
+  margin-bottom: 2rem;
   font-size: 1rem;
 }
+
 .dashboard-divider {
-  margin-bottom: 2rem;
-  background: #e94f4f;
+  margin: 0 auto 2rem auto;
+  background-color: #FFD700;
   height: 2px;
-  border-radius: 2px;
+  width: 50px;
+  border: none;
+  opacity: 0.5;
 }
+
 .dashboard-wallet-label {
-  font-family: 'Press Start 2P', monospace;
-  font-weight: 700;
-  color: #e94f4f;
-  margin-bottom: 1rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  color: #EAEAEA;
+  margin-bottom: 0.5rem;
   font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
+
 .dashboard-wallet {
-  font-family: 'Press Start 2P', monospace;
+  font-family: 'Inter', sans-serif;
   font-weight: 900;
-  color: #e94f4f;
-  margin-bottom: 2rem;
-  font-size: 2rem;
+  color: #FFD700;
+  margin-bottom: 2.5rem;
+  font-size: 2.5rem;
+  letter-spacing: 1px;
 }
+
 .dashboard-btn {
-  font-family: 'Press Start 2P', monospace;
-  font-weight: 900;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
   font-size: 1.1rem;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  margin-bottom: 1.5rem;
-  padding: 1rem 0;
-  image-rendering: pixelated;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  margin-bottom: 1rem;
+  padding: 0.8rem 0;
+  width: 100%;
+  transition: all 0.3s ease;
+  border: none;
 }
-.dashboard-btn.wallet {
-  background-color: #e94f4f;
-  color: #fff;
+
+.dashboard-btn.wallet, .dashboard-btn.games {
+  background-color: #FFD700;
+  color: #121212;
 }
-.dashboard-btn.wallet:hover {
-  background-color: #ff7c7c;
+
+.dashboard-btn.wallet:hover, .dashboard-btn.games:hover {
+  background-color: #FFEC80;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  transform: translateY(-2px);
 }
-.dashboard-btn.games {
-  background-color: #4f6ee9;
-  color: #fff;
-}
-.dashboard-btn.games:hover {
-  background-color: #7cbcff;
-}
+
 .dashboard-btn.logout {
-  color: #e94f4f;
-  border: 2px solid #e94f4f;
-  background: #fff;
+  color: #FFD700;
+  background-color: transparent;
+  border: 2px solid #FFD700;
+  margin-top: 1rem;
 }
+
 .dashboard-btn.logout:hover {
-  background: #ffeaea;
+  background-color: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
 }
+
 @media (max-width: 600px) {
   .dashboard-box {
-    max-width: 95vw;
-    padding: 1.5rem 0.5rem;
-    border-radius: 16px;
+    max-width: 90vw;
+    padding: 2rem 1.5rem;
   }
   .dashboard-title {
-    font-size: 1.2rem;
-    margin-bottom: 1rem;
+    font-size: 1.8rem;
   }
   .dashboard-wallet {
-    font-size: 1.2rem;
-    margin-bottom: 1rem;
+    font-size: 2rem;
   }
   .dashboard-btn {
-    font-size: 0.9rem;
-    padding: 0.7rem 0;
+    font-size: 1rem;
   }
 }

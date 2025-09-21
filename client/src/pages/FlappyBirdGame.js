@@ -1,87 +1,228 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import './FlappyBirdGame.css';
 
-// --- Constants ---
-const BIRD_DEFAULTS = { x: 50, y: 150, width: 25, height: 25 };
-const GRAVITY = 0.4;
-const LIFT = -7;
-const PIPE_DEFAULTS = { width: 50, gap: 150 };
-const GAME_SPEED = 3;
+const TIME_OPTIONS = Array.from({ length: 10 }, (_, i) => 15 + i * 5); // 15, 20, ..., 60
 
-// --- Helper Components ---
-const SetupScreen = ({ onStart, wallet, error }) => {
-    const [timeInput, setTimeInput] = useState(30);
-    const [wagerInput, setWagerInput] = useState(100);
-    const handleStart = () => {
-        onStart({
-            targetTime: parseInt(timeInput, 10) || 30,
-            wagerAmount: parseInt(wagerInput, 10) || 100,
-        });
-    };
+function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
+    const canvasRef = useRef(null);
+    const [running, setRunning] = useState(true);
+    const [elapsed, setElapsed] = useState(0);
+    const requestRef = useRef();
+    const timerRef = useRef();
+
+    // Responsive canvas size
+    const [canvasSize, setCanvasSize] = useState({ w: 360, h: 480 });
+
+    // Game state
+    const bird = useRef({ x: 60, y: 200, vy: 0, width: 32, height: 32 });
+    const pipes = useRef([]);
+    const gravity = 0.5;
+    const lift = -8.5;
+    const pipeGap = 140;
+    const pipeWidth = 52;
+    const pipeSpeed = 2.8;
+
+    // Resize canvas to fit viewport (no scroll)
+    useEffect(() => {
+        function resize() {
+            const vh = window.innerHeight;
+            const vw = window.innerWidth;
+            // Fit to viewport, max 400x600, min 240x320
+            let w = Math.min(400, Math.max(240, vw * 0.95));
+            let h = Math.min(600, Math.max(320, vh * 0.8));
+            setCanvasSize({ w: Math.round(w), h: Math.round(h) });
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        return () => window.removeEventListener('resize', resize);
+    }, []);
+
+    // Handle jump/tap (debounced for smoothness)
+    useEffect(() => {
+        let lastJump = 0;
+        function jump(e) {
+            // Only allow jump every 80ms for smoothness
+            const now = Date.now();
+            if (now - lastJump < 80) return;
+            if (e.type === 'keydown' && e.code !== 'Space') return;
+            bird.current.vy = lift;
+            lastJump = now;
+        }
+        // Use pointerdown for best mobile/desktop tap
+        window.addEventListener('pointerdown', jump);
+        window.addEventListener('keydown', jump);
+        return () => {
+            window.removeEventListener('pointerdown', jump);
+            window.removeEventListener('keydown', jump);
+        };
+    }, []);
+
+    // Main game loop
+    useEffect(() => {
+        if (!running) return;
+        const ctx = canvasRef.current.getContext('2d');
+        let frame = 0;
+        const { w: canvasW, h: canvasH } = canvasSize;
+
+        function reset() {
+            bird.current = { x: 60, y: canvasH / 2, vy: 0, width: 32, height: 32 };
+            pipes.current = [];
+            setElapsed(0);
+            if (setElapsedExternal) setElapsedExternal(0);
+            frame = 0;
+        }
+
+        function drawBird() {
+            ctx.save();
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(bird.current.x + 16, bird.current.y + 16, 16, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = '#a16207';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // Eye
+            ctx.beginPath();
+            ctx.arc(bird.current.x + 22, bird.current.y + 12, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(bird.current.x + 23, bird.current.y + 12, 1.2, 0, 2 * Math.PI);
+            ctx.fillStyle = '#23243a';
+            ctx.fill();
+            // Beak
+            ctx.beginPath();
+            ctx.moveTo(bird.current.x + 32, bird.current.y + 16);
+            ctx.lineTo(bird.current.x + 38, bird.current.y + 13);
+            ctx.lineTo(bird.current.x + 38, bird.current.y + 19);
+            ctx.closePath();
+            ctx.fillStyle = '#ffb300';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawPipes() {
+            ctx.save();
+            ctx.fillStyle = '#22c55e';
+            ctx.strokeStyle = '#15803d';
+            ctx.lineWidth = 4;
+            pipes.current.forEach(pipe => {
+                ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+                ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
+                ctx.fillRect(pipe.x, pipe.bottom, pipeWidth, canvasH - pipe.bottom);
+                ctx.strokeRect(pipe.x, pipe.bottom, pipeWidth, canvasH - pipe.bottom);
+            });
+            ctx.restore();
+        }
+
+        function drawBg() {
+            ctx.fillStyle = '#181c2f';
+            ctx.fillRect(0, 0, canvasW, canvasH);
+        }
+
+        function draw() {
+            drawBg();
+            drawPipes();
+            drawBird();
+        }
+
+        function collision() {
+            // Ground/ceiling
+            if (bird.current.y < 0 || bird.current.y + bird.current.height > canvasH) return true;
+            // Pipes
+            for (let pipe of pipes.current) {
+                if (
+                    bird.current.x + bird.current.width > pipe.x &&
+                    bird.current.x < pipe.x + pipeWidth &&
+                    (bird.current.y < pipe.top || bird.current.y + bird.current.height > pipe.bottom)
+                ) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function step() {
+            frame++;
+            // Bird physics
+            bird.current.vy += gravity;
+            bird.current.y += bird.current.vy;
+            // Pipes
+            if (frame % 90 === 0) {
+                const top = Math.random() * (canvasH - pipeGap - 80) + 40;
+                pipes.current.push({
+                    x: canvasW,
+                    top,
+                    bottom: top + pipeGap,
+                });
+            }
+            pipes.current.forEach(pipe => (pipe.x -= pipeSpeed));
+            pipes.current = pipes.current.filter(pipe => pipe.x + pipeWidth > 0);
+            // Draw
+            draw();
+            // Collision
+            if (collision()) {
+                setRunning(false);
+                onGameOver(false, elapsed);
+                return;
+            }
+            // Win
+            if (elapsed >= targetTime) {
+                setRunning(false);
+                onGameOver(true, elapsed);
+                return;
+            }
+            requestRef.current = requestAnimationFrame(step);
+        }
+
+        reset();
+        requestRef.current = requestAnimationFrame(step);
+        timerRef.current = setInterval(() => {
+            setElapsed(e => {
+                if (setElapsedExternal) setElapsedExternal(e + 1);
+                return e + 1;
+            });
+        }, 1000);
+        return () => {
+            cancelAnimationFrame(requestRef.current);
+            clearInterval(timerRef.current);
+        };
+        // eslint-disable-next-line
+    }, [running, canvasSize]);
+
     return (
-        <div className="flappy-modal pixel-bg flex flex-col items-center justify-center p-6 text-center rounded-2xl shadow-xl w-full max-w-xs mx-auto">
-            <h1 className="pixel-title text-yellow-400 mb-2">Flappy</h1>
-            <h1 className="pixel-title text-yellow-400 mb-8">Challenge</h1>
-            <div className="w-full mb-4">
-                <label htmlFor="time-input" className="pixel-label mb-2">Time to Beat (s)</label>
-                <input id="time-input" type="number" value={timeInput} onChange={e => setTimeInput(e.target.value)} className="pixel-input" />
-            </div>
-            <div className="w-full mb-6">
-                <label htmlFor="wager-input" className="pixel-label mb-2">Wager Amount ($)</label>
-                <input id="wager-input" type="number" value={wagerInput} onChange={e => setWagerInput(e.target.value)} className="pixel-input" />
-            </div>
-            <button onClick={handleStart} className="pixel-btn pixel-btn-green w-full py-4 text-2xl mt-2">START</button>
-            {error && <div className="pixel-label text-red-400 mt-4 font-bold">{error}</div>}
-            {wallet !== null && <div className="pixel-label text-yellow-400 mt-4 font-bold">Wallet: ${wallet}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'manipulation', width: '100%', gap: 12 }}>
+            <canvas
+                ref={canvasRef}
+                width={canvasSize.w}
+                height={canvasSize.h}
+                style={{
+                    background: 'var(--accent-bg)',
+                    borderRadius: 12,
+                    boxShadow: 'var(--shadow-primary)',
+                    border: '2px solid var(--border-primary)',
+                    width: '100%',
+                    maxWidth: 400,
+                    maxHeight: 600,
+                    cursor: 'pointer',
+                    touchAction: 'none',
+                    userSelect: 'none'
+                }}
+            />
+            <div style={{ color: 'var(--text-gold)', fontWeight: 700, fontSize: 18 }}>Time: {elapsed}s</div>
         </div>
     );
-};
+}
 
-const GameOverModal = ({ isWin, elapsedTime, wagerAmount, onPlayAgain }) => (
-    <div className="flappy-modal pixel-bg flex flex-col items-center justify-center p-6 text-center rounded-2xl shadow-xl w-full max-w-xs mx-auto">
-        <h2 className={`pixel-title mb-4 ${isWin ? 'text-green-400' : 'text-red-400'}`}>{isWin ? 'YOU WON!' : 'YOU LOST!'}</h2>
-        <div className="pixel-modal-box mb-6">
-            <p className="pixel-label">TIME SURVIVED</p>
-            <p className="pixel-value mb-2">{elapsedTime}s</p>
-            <p className="pixel-label">WAGER</p>
-            <p className={`pixel-value ${isWin ? 'text-green-400' : 'text-red-400'}`}>{isWin ? `+$${wagerAmount}` : `-$${wagerAmount}`}</p>
-        </div>
-        <button onClick={onPlayAgain} className="pixel-btn pixel-btn-yellow w-full py-4 text-2xl mt-2">AGAIN?</button>
-    </div>
-);
-
-const GameInfo = ({ elapsedTime, targetTime, wagerAmount }) => (
-     <div className="absolute top-0 left-0 right-0 z-20 p-4 flex justify-between text-lg pixel-label">
-         <div>
-            <span>Time: </span><span>{elapsedTime}s</span>
-        </div>
-        <div>
-            <span>Target: </span><span>{targetTime}s</span>
-        </div>
-         <div>
-            <span>Wager: $</span><span>{wagerAmount}</span>
-        </div>
-    </div>
-);
-
-export default function FlappyBirdGame() {
+function FlappyBirdGame() {
     const [gameState, setGameState] = useState('setup'); // 'setup', 'playing', 'gameOver'
-    const [settings, setSettings] = useState({ targetTime: 30, wagerAmount: 100 });
-    const [elapsedTime, setElapsedTime] = useState(0);
-    const [isWin, setIsWin] = useState(false);
+    const [targetTime, setTargetTime] = useState(30);
+    const [wager, setWager] = useState(100);
+    const [result, setResult] = useState(null); // { win, time: int }
+    const [elapsed, setElapsed] = useState(0); // Track elapsed time externally
     const [wallet, setWallet] = useState(null);
     const [error, setError] = useState('');
-    const canvasRef = useRef(null);
-    const gameLoopId = useRef(null);
-    const timerId = useRef(null);
-    const mutableGameState = useRef({
-        bird: { ...BIRD_DEFAULTS },
-        pipes: [],
-        velocity: 0,
-        frameCount: 0,
-    }).current;
 
     // Fetch wallet on mount and after game reset
     useEffect(() => {
@@ -95,167 +236,196 @@ export default function FlappyBirdGame() {
         fetchWallet();
     }, [gameState]);
 
-    const endGame = useCallback(async (didWin) => {
+    const handleStart = e => {
+        e.preventDefault();
+        setResult(null);
+        setError('');
+        if (wallet !== null && wager > wallet) {
+            setError('Insufficient balance');
+            return;
+        }
+        setGameState('playing');
+    };
+
+    const handleGameOver = async (win, time) => {
+        setResult({ win, time });
         setGameState('gameOver');
-        setIsWin(didWin);
-        if (gameLoopId.current) cancelAnimationFrame(gameLoopId.current);
-        if (timerId.current) clearInterval(timerId.current);
         // Update wallet in Firestore
         const user = auth.currentUser;
         if (user) {
             const userRef = doc(db, 'users', user.uid);
             const userDoc = await getDoc(userRef);
             let newWallet = userDoc.data().wallet || 0;
-            if (didWin) {
-                newWallet += settings.wagerAmount;
+            if (win) {
+                newWallet += wager;
             } else {
-                newWallet -= settings.wagerAmount;
+                newWallet -= wager;
             }
             await updateDoc(userRef, { wallet: newWallet });
             setWallet(newWallet);
         }
-    }, [settings.wagerAmount]);
-
-    const handleInput = useCallback(() => {
-        mutableGameState.velocity = LIFT;
-    }, [mutableGameState]);
-
-    useEffect(() => {
-        if (gameState !== 'playing') return;
-        const handleKeyDown = (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                handleInput();
-            }
-        };
-        document.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('mousedown', handleInput);
-        document.addEventListener('touchstart', handleInput);
-        return () => {
-            document.removeEventListener('keydown', handleKeyDown);
-            document.removeEventListener('mousedown', handleInput);
-            document.removeEventListener('touchstart', handleInput);
-        };
-    }, [gameState, handleInput]);
-
-    useEffect(() => {
-        if (gameState !== 'playing') return;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        const gameLoop = () => {
-            mutableGameState.velocity += GRAVITY;
-            mutableGameState.bird.y += mutableGameState.velocity;
-            mutableGameState.frameCount++;
-            if (mutableGameState.bird.y + BIRD_DEFAULTS.height > canvas.height || mutableGameState.bird.y < 0) {
-                endGame(false);
-                return;
-            }
-            for (let pipe of mutableGameState.pipes) {
-                if (
-                    mutableGameState.bird.x < pipe.x + PIPE_DEFAULTS.width &&
-                    mutableGameState.bird.x + BIRD_DEFAULTS.width > pipe.x &&
-                    mutableGameState.bird.y < pipe.y + pipe.height &&
-                    mutableGameState.bird.y + BIRD_DEFAULTS.height > pipe.y
-                ) {
-                    endGame(false);
-                    return;
-                }
-            }
-            if (mutableGameState.frameCount % 100 === 0) {
-                const gapY = Math.random() * (canvas.height - PIPE_DEFAULTS.gap * 2) + PIPE_DEFAULTS.gap;
-                mutableGameState.pipes.push({ x: canvas.width, y: 0, height: gapY - PIPE_DEFAULTS.gap / 2 });
-                mutableGameState.pipes.push({ x: canvas.width, y: gapY + PIPE_DEFAULTS.gap / 2, height: canvas.height });
-            }
-            mutableGameState.pipes.forEach(pipe => pipe.x -= GAME_SPEED);
-            mutableGameState.pipes = mutableGameState.pipes.filter(pipe => pipe.x + PIPE_DEFAULTS.width > 0);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#FFD700';
-            ctx.fillRect(mutableGameState.bird.x, mutableGameState.bird.y, BIRD_DEFAULTS.width, BIRD_DEFAULTS.height);
-            ctx.strokeStyle = '#a16207';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(mutableGameState.bird.x, mutableGameState.bird.y, BIRD_DEFAULTS.width, BIRD_DEFAULTS.height);
-            ctx.fillStyle = '#22c55e';
-            ctx.strokeStyle = '#15803d';
-            ctx.lineWidth = 4;
-            mutableGameState.pipes.forEach(pipe => {
-                 ctx.fillRect(pipe.x, pipe.y, PIPE_DEFAULTS.width, pipe.height);
-                 ctx.strokeRect(pipe.x, pipe.y, PIPE_DEFAULTS.width, pipe.height);
-            });
-            gameLoopId.current = requestAnimationFrame(gameLoop);
-        };
-        gameLoopId.current = requestAnimationFrame(gameLoop);
-        timerId.current = setInterval(() => {
-            setElapsedTime(prevTime => {
-                const newTime = prevTime + 1;
-                if (newTime >= settings.targetTime) {
-                    endGame(true);
-                }
-                return newTime;
-            });
-        }, 1000);
-        return () => {
-            if (gameLoopId.current) cancelAnimationFrame(gameLoopId.current);
-            if (timerId.current) clearInterval(timerId.current);
-        };
-    }, [gameState, settings.targetTime, endGame, mutableGameState]);
-
-    const startGame = (newSettings) => {
-        setError('');
-        if (wallet !== null && newSettings.wagerAmount > wallet) {
-            setError('Insufficient balance');
-            return;
-        }
-        setSettings(newSettings);
-        setElapsedTime(0);
-        const canvas = canvasRef.current;
-        mutableGameState.bird = { ...BIRD_DEFAULTS, y: canvas.height / 2 };
-        mutableGameState.pipes = [];
-        mutableGameState.velocity = 0;
-        mutableGameState.frameCount = 0;
-        setGameState('playing');
     };
 
-    const resetGame = () => {
+    const handleAgain = () => {
         setGameState('setup');
+        setResult(null);
+        setElapsed(0);
         setError('');
     };
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        const container = canvas.parentElement;
-        const resizeCanvas = () => {
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-        };
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-        return () => window.removeEventListener('resize', resizeCanvas);
-    }, []);
 
     return (
-        <div className="pixel-bg min-h-screen flex items-center justify-center text-white font-['Press_Start_2P']">
-            <div className="flappy-canvas-container flex flex-col items-center justify-center mx-auto my-8">
-              <div className="relative bg-[#1a2236] rounded-2xl shadow-2xl border-4 border-[#23243a] flex items-center justify-center overflow-hidden"
-                style={{ width: '95vw', maxWidth: 400, height: '70vh', maxHeight: 600 }}>
-                {gameState === 'setup' && <SetupScreen onStart={startGame} wallet={wallet} error={error} />}
-                {gameState === 'gameOver' && (
-                  <GameOverModal 
-                    isWin={isWin} 
-                    elapsedTime={elapsedTime} 
-                    wagerAmount={settings.wagerAmount}
-                    onPlayAgain={resetGame}
-                  />
-                )}
-                {gameState === 'playing' && (
-                  <GameInfo 
-                    elapsedTime={elapsedTime} 
-                    targetTime={settings.targetTime}
-                    wagerAmount={settings.wagerAmount}
-                  />
-                )}
-                <canvas ref={canvasRef} width={window.innerWidth < 500 ? window.innerWidth * 0.95 : 400} height={window.innerHeight < 700 ? window.innerHeight * 0.7 : 600} className="absolute top-0 left-0 pixel-canvas" style={{ imageRendering: 'pixelated', borderRadius: '1rem', width: '100%', height: '100%' }} />
-              </div>
+        <div className="gaming-page">
+            <div className="gaming-container">
+                <div className="gaming-card" style={{
+                    width: '100%',
+                    maxWidth: 400,
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 20
+                }}>
+                    {gameState === 'setup' && (
+                        <form onSubmit={handleStart} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+                            <h1 style={{
+                                fontSize: 28,
+                                fontWeight: 700,
+                                color: 'var(--text-gold)',
+                                margin: 0,
+                                textAlign: 'center',
+                                letterSpacing: '1px'
+                            }}>
+                                Flappy Bird Challenge
+                            </h1>
+                            
+                            <div style={{ width: '100%' }}>
+                                <label style={{
+                                    display: 'block',
+                                    color: 'var(--text-primary)',
+                                    marginBottom: 8,
+                                    fontWeight: 500,
+                                    fontSize: 16
+                                }}>
+                                    Time to Beat (seconds)
+                                </label>
+                                <select
+                                    value={targetTime}
+                                    onChange={e => setTargetTime(Number(e.target.value))}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        borderRadius: 8,
+                                        background: 'var(--accent-bg)',
+                                        color: 'var(--text-primary)',
+                                        border: '2px solid var(--border-secondary)',
+                                        fontSize: 16,
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    {TIME_OPTIONS.map(opt => (
+                                        <option key={opt} value={opt}>{opt} seconds</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <div style={{ width: '100%' }}>
+                                <label style={{
+                                    display: 'block',
+                                    color: 'var(--text-primary)',
+                                    marginBottom: 8,
+                                    fontWeight: 500,
+                                    fontSize: 16
+                                }}>
+                                    Wager Amount ($)
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={wager}
+                                    onChange={e => setWager(Number(e.target.value))}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        borderRadius: 8,
+                                        background: 'var(--accent-bg)',
+                                        color: 'var(--text-primary)',
+                                        border: '2px solid var(--border-secondary)',
+                                        fontSize: 16,
+                                        fontWeight: 500
+                                    }}
+                                />
+                            </div>
+                            
+                            <button
+                                type="submit"
+                                className="gaming-button-primary"
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 0',
+                                    borderRadius: 8,
+                                    background: 'var(--gradient-gold)',
+                                    color: 'var(--primary-bg)',
+                                    border: 'none',
+                                    fontWeight: 700,
+                                    fontSize: 18,
+                                    cursor: 'pointer',
+                                    boxShadow: 'var(--shadow-primary)'
+                                }}
+                            >
+                                Start Game
+                            </button>
+                            
+                            {error && <div style={{ color: 'var(--red-accent)', fontWeight: 600, textAlign: 'center' }}>{error}</div>}
+                            {wallet !== null && <div style={{ color: 'var(--text-gold)', fontWeight: 600, textAlign: 'center' }}>Wallet: ${wallet}</div>}
+                        </form>
+                    )}
+                    
+                    {gameState === 'playing' && (
+                        <FlappyBirdCanvas onGameOver={handleGameOver} targetTime={targetTime} setElapsedExternal={setElapsed} />
+                    )}
+                    
+                    {gameState === 'gameOver' && result && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
+                            <h2 style={{
+                                fontSize: 24,
+                                fontWeight: 700,
+                                color: result.win ? 'var(--green-accent)' : 'var(--red-accent)',
+                                margin: 0,
+                                textAlign: 'center'
+                            }}>
+                                {result.win ? 'YOU WON!' : 'GAME OVER'}
+                            </h2>
+                            
+                            <div style={{ color: 'var(--text-primary)', fontSize: 16, textAlign: 'center', lineHeight: 1.6 }}>
+                                <div>Time Survived: <strong style={{ color: 'var(--text-gold)' }}>{result.time ?? elapsed}s</strong></div>
+                                <div>Wager: <strong style={{ color: 'var(--text-gold)' }}>${wager}</strong></div>
+                                {wallet !== null && <div>Wallet: <strong style={{ color: 'var(--text-gold)' }}>${wallet}</strong></div>}
+                            </div>
+                            
+                            <button
+                                onClick={handleAgain}
+                                className="gaming-button-primary"
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 0',
+                                    borderRadius: 8,
+                                    background: 'var(--gradient-gold)',
+                                    color: 'var(--primary-bg)',
+                                    border: 'none',
+                                    fontWeight: 700,
+                                    fontSize: 18,
+                                    cursor: 'pointer',
+                                    boxShadow: 'var(--shadow-primary)'
+                                }}
+                            >
+                                Play Again
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
+
+export default FlappyBirdGame;

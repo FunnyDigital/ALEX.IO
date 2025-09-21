@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Typography, Button, TextField, MenuItem } from '@mui/material';
-import './TradeGambleMobile.css';
+
 import { rtdb, auth, db } from '../firebase';
 import { ref, onValue, set, push, update, serverTimestamp } from 'firebase/database';
 import { doc, getDoc } from 'firebase/firestore';
@@ -238,57 +238,292 @@ function TradeGamble() {
   };
 
   return (
-    <div className="trade-root">
-      <div className="trade-container">
-        <div className="trade-graph-area">
-          {renderGraph()}
-        </div>
-        <div className="trade-leaderboard">
-          <Typography style={{ fontWeight: 900, color: '#7cbcff', marginBottom: '1rem', fontSize: '1.1rem' }}>Current Trades</Typography>
-          {trades.length === 0 && <div>No trades yet.</div>}
-          {trades.map((trade, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', alignItems: 'center' }}>
-              <span>{trade.name}</span>
-              <span style={{ color: trade.type === 'buy' ? '#4f6ee9' : '#e94f4f' }}>{trade.type === 'buy' ? 'Buy' : 'Sell'}</span>
-              <span>Bet: {trade.bet}</span>
-              <span>
-                {trade.resolved ? (
-                  <b style={{ color: trade.win ? '#4f6ee9' : '#e94f4f' }}>{trade.win ? 'Win' : 'Lose'} {trade.win ? `(+${trade.profit})` : ''}</b>
-                ) : (
-                  <span style={{ color: '#aaa' }}>Pending</span>
-                )}
-              </span>
+    <div className="gaming-page">
+      <div className="gaming-container" style={{ maxWidth: '900px', width: '100%' }}>
+        <div className="gaming-card" style={{
+          width: '100%',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 20
+        }}>
+          <div style={{
+            color: 'var(--text-gold)',
+            textAlign: 'center',
+            fontSize: 28,
+            fontWeight: 700,
+            margin: 0
+          }}>
+            Trade Gamble
+          </div>
+          
+          {/* Graph Area */}
+          <div style={{
+            background: 'var(--accent-bg)',
+            borderRadius: 12,
+            border: '2px solid var(--border-primary)',
+            overflow: 'hidden'
+          }}>
+            {renderGraph()}
+          </div>
+          
+          {/* Current Trades */}
+          <div style={{
+            background: 'var(--accent-bg)',
+            borderRadius: 12,
+            border: '1px solid var(--border-secondary)',
+            padding: '16px'
+          }}>
+            <Typography style={{ 
+              fontWeight: 700, 
+              color: 'var(--text-gold)', 
+              marginBottom: '16px', 
+              fontSize: '18px',
+              textAlign: 'center'
+            }}>
+              Current Trades
+            </Typography>
+            {trades.length === 0 && (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '8px' }}>
+                No active trades
+              </div>
+            )}
+            {trades.map((trade, i) => (
+              <div key={i} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '8px',
+                padding: '8px',
+                background: 'var(--secondary-bg)',
+                borderRadius: 8,
+                border: `1px solid ${trade.resolved ? (trade.win ? 'var(--green-accent)' : 'var(--red-accent)') : 'var(--border-secondary)'}`
+              }}>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{trade.name}</span>
+                <span style={{ 
+                  color: trade.type === 'buy' ? 'var(--green-accent)' : 'var(--red-accent)',
+                  fontWeight: 700
+                }}>
+                  {trade.type === 'buy' ? 'BUY' : 'SELL'}
+                </span>
+                <span style={{ color: 'var(--text-gold)' }}>Bet: ${trade.bet}</span>
+                <span>
+                  {trade.resolved ? (
+                    <b style={{ color: trade.win ? 'var(--green-accent)' : 'var(--red-accent)' }}>
+                      {trade.win ? 'Win' : 'Lose'} {trade.win ? `(+$${trade.profit})` : ''}
+                    </b>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>Pending</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+          
+          {/* Controls */}
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 16,
+            background: 'var(--accent-bg)',
+            padding: '20px',
+            borderRadius: 12,
+            border: '1px solid var(--border-secondary)'
+          }}>
+            {/* Input Row */}
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <TextField 
+                label="Base Bet" 
+                type="number" 
+                value={baseBet} 
+                onChange={e => setBaseBet(e.target.value)} 
+                disabled={!!activeTrade}
+                InputProps={{ 
+                  style: { 
+                    color: 'var(--text-primary)', 
+                    fontWeight: 600, 
+                    background: 'var(--secondary-bg)', 
+                    borderRadius: 8 
+                  } 
+                }}
+                InputLabelProps={{
+                  style: { 
+                    color: 'var(--text-secondary)'
+                  }
+                }}
+                sx={{
+                  flex: 1, 
+                  minWidth: 120,
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                      borderColor: 'var(--border-secondary)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'var(--border-primary)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'var(--border-primary)',
+                    },
+                  },
+                }}
+              />
+              <TextField 
+                select 
+                label="Multiplier" 
+                value={multiplier} 
+                onChange={e => handleMultiplierChange(Number(e.target.value))} 
+                disabled={!activeTrade}
+                InputProps={{ 
+                  style: { 
+                    color: 'var(--text-primary)', 
+                    fontWeight: 600, 
+                    background: 'var(--secondary-bg)', 
+                    borderRadius: 8 
+                  } 
+                }}
+                InputLabelProps={{
+                  style: { 
+                    color: 'var(--text-secondary)'
+                  }
+                }}
+                sx={{
+                  flex: 1, 
+                  minWidth: 120,
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                      borderColor: 'var(--border-secondary)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'var(--border-primary)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'var(--border-primary)',
+                    },
+                  },
+                }}
+              >
+                {[1,2,5,10,20].map(m => <MenuItem key={m} value={m}>x{m}</MenuItem>)}
+              </TextField>
+              <TextField 
+                select 
+                label="Duration" 
+                value={duration} 
+                onChange={e => setDuration(Number(e.target.value))} 
+                disabled={!!activeTrade}
+                InputProps={{ 
+                  style: { 
+                    color: 'var(--text-primary)', 
+                    fontWeight: 600, 
+                    background: 'var(--secondary-bg)', 
+                    borderRadius: 8 
+                  } 
+                }}
+                InputLabelProps={{
+                  style: { 
+                    color: 'var(--text-secondary)'
+                  }
+                }}
+                sx={{
+                  flex: 1, 
+                  minWidth: 120,
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                      borderColor: 'var(--border-secondary)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'var(--border-primary)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'var(--border-primary)',
+                    },
+                  },
+                }}
+              >
+                {[1,2,5,10].map(d => <MenuItem key={d} value={d}>{d} min</MenuItem>)}
+              </TextField>
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="trade-controls">
-        <Typography style={{ fontFamily: 'Press Start 2P', fontWeight: 900, fontSize: '1.2rem', color: '#e94f4f', marginBottom: '1rem' }}>Trade Gamble</Typography>
-        <div className="trade-controls-row">
-          <TextField label="Base Bet" type="number" value={baseBet} onChange={e => setBaseBet(e.target.value)} style={{ marginRight: '1rem', flex: 1 }} disabled={!!activeTrade} />
-          <TextField select label="Multiplier" value={multiplier} onChange={e => handleMultiplierChange(Number(e.target.value))} style={{ marginRight: '1rem', flex: 1 }} disabled={!activeTrade}>
-            {[1,2,5,10,20].map(m => <MenuItem key={m} value={m}>x{m}</MenuItem>)}
-          </TextField>
-          <TextField select label="Duration" value={duration} onChange={e => setDuration(Number(e.target.value))} style={{ flex: 1 }} disabled={!!activeTrade}>
-            {[1,2,5,10].map(d => <MenuItem key={d} value={d}>{d} min</MenuItem>)}
-          </TextField>
-        </div>
-        <div className="trade-controls-row" style={{ justifyContent: 'center', fontWeight: 700, fontFamily: 'monospace', color: '#222' }}>
-          <span>Current Bet: {activeTrade ? activeTrade.bet : baseBet}</span>
-        </div>
-  {/* Multiplier slider removed */}
-        <div className="trade-controls-row" style={{ justifyContent: 'center' }}>
-          <Button className="trade-btn buy" style={{background:'#27ae60',borderColor:'#27ae60'}} disabled={!!activeTrade || !baseBet} onClick={() => handleTrade('buy')}>BUY</Button>
-          <Button className="trade-btn sell" style={{background:'#e94f4f',borderColor:'#e94f4f'}} disabled={!!activeTrade || !baseBet} onClick={() => handleTrade('sell')}>SELL</Button>
-        </div>
-        <div className="trade-summary">
-          {activeTrade && !activeTrade.resolved && tradeTimer !== null && (
-            <span>Time left: <b style={{ color: '#4f6ee9' }}>{tradeTimer}s</b></span>
-          )}
-          {myTrade && myTrade.resolved && (
-            <span>Result: <b style={{ color: myTrade.win ? '#4f6ee9' : '#e94f4f' }}>{myTrade.win ? 'Win' : 'Lose'} {myTrade.win ? `(+${myTrade.profit})` : ''}</b></span>
-          )}
-          {error && <span style={{ color: '#e94f4f' }}>{error}</span>}
+            
+            {/* Current Bet Display */}
+            <div style={{ 
+              textAlign: 'center', 
+              fontWeight: 700, 
+              color: 'var(--text-gold)',
+              fontSize: 16
+            }}>
+              Current Bet: ${activeTrade ? activeTrade.bet : baseBet || 0}
+            </div>
+            
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+              <Button 
+                variant="contained"
+                disabled={!!activeTrade || !baseBet} 
+                onClick={() => handleTrade('buy')}
+                sx={{ 
+                  flex: 1,
+                  maxWidth: 150,
+                  background: 'var(--green-accent)',
+                  color: 'var(--primary-bg)',
+                  fontWeight: 700,
+                  fontSize: 16,
+                  borderRadius: 2,
+                  padding: '12px 0',
+                  '&:hover': {
+                    background: 'var(--green-secondary)',
+                  },
+                  '&:disabled': {
+                    background: 'var(--accent-bg)',
+                    color: 'var(--text-muted)',
+                  }
+                }}
+              >
+                BUY
+              </Button>
+              <Button 
+                variant="contained"
+                disabled={!!activeTrade || !baseBet} 
+                onClick={() => handleTrade('sell')}
+                sx={{ 
+                  flex: 1,
+                  maxWidth: 150,
+                  background: 'var(--red-accent)',
+                  color: 'var(--primary-bg)',
+                  fontWeight: 700,
+                  fontSize: 16,
+                  borderRadius: 2,
+                  padding: '12px 0',
+                  '&:hover': {
+                    background: 'var(--red-secondary)',
+                  },
+                  '&:disabled': {
+                    background: 'var(--accent-bg)',
+                    color: 'var(--text-muted)',
+                  }
+                }}
+              >
+                SELL
+              </Button>
+            </div>
+            
+            {/* Status Display */}
+            <div style={{ textAlign: 'center' }}>
+              {activeTrade && !activeTrade.resolved && tradeTimer !== null && (
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                  Time left: <b style={{ color: 'var(--gold-primary)' }}>{tradeTimer}s</b>
+                </span>
+              )}
+              {myTrade && myTrade.resolved && (
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                  Result: <b style={{ color: myTrade.win ? 'var(--green-accent)' : 'var(--red-accent)' }}>
+                    {myTrade.win ? 'Win' : 'Lose'} {myTrade.win ? `(+$${myTrade.profit})` : ''}
+                  </b>
+                </span>
+              )}
+              {error && (
+                <span style={{ color: 'var(--red-accent)', fontWeight: 600 }}>{error}</span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

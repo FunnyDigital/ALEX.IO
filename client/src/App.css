@@ -1,80 +1,291 @@
-body {
+
+/* Global Gaming Theme Variables */
+:root {
+  /* Primary Colors */
+  --primary-bg: #1a1a2e;
+  --secondary-bg: #16213e;
+  --accent-bg: #23243a;
+  --card-bg: #2d2d44;
+  --overlay-bg: rgba(26, 26, 46, 0.95);
+  
+  /* Accent Colors */
+  --gold-primary: #FFD700;
+  --gold-secondary: #FFC947;
+  --blue-primary: #2563eb;
+  --blue-secondary: #3b82f6;
+  --red-accent: #ef4444;
+  --green-accent: #10b981;
+  
+  /* Text Colors */
+  --text-primary: #EAEAEA;
+  --text-secondary: #B0B0B0;
+  --text-muted: #888888;
+  --text-gold: #FFD700;
+  
+  /* Gaming UI */
+  --border-primary: #FFD700;
+  --border-secondary: #4a4a4a;
+  --shadow-primary: 0 8px 32px rgba(255, 215, 0, 0.15);
+  --shadow-dark: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --gradient-gold: linear-gradient(135deg, #FFD700 0%, #FFC947 100%);
+  --gradient-blue: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  --gradient-bg: linear-gradient(135deg, #1a1a2e 0%, #23243a 100%);
+}
+
+/* Global Styles */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
   margin: 0;
-  font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  background: linear-gradient(135deg, #23243a 0%, #181a2a 100%);
-  color: #f5f7fa;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: var(--gradient-bg);
+  color: var(--text-primary);
+  /* iOS specific fixes */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
-}
-
-.app-card {
-  background: linear-gradient(135deg, #23243a 0%, #181a2a 100%);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-  padding: 2rem;
-  margin: 2rem auto;
-  max-width: 420px;
-  color: #f5f7fa;
+#root {
+  height: 100vh;
+  height: 100dvh; /* Use dynamic viewport height for mobile */
+  width: 100vw;
+  overflow: hidden;
   position: relative;
 }
 
-.app-header {
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: #ffd700;
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.app-section-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #ffd700;
-  margin-bottom: 1rem;
-}
-
-.app-progress-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: #2c2e4a;
-  margin-bottom: 0.5rem;
+/* Gaming Theme Classes */
+.gaming-page {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  width: 100vw;
   overflow: hidden;
-}
-.app-progress-bar-inner {
-  height: 100%;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #ffd700 0%, #ffec80 100%);
-}
-
-.app-icon {
-  width: 32px;
-  height: 32px;
-  margin-right: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--gradient-bg);
+  position: relative;
+  /* iOS Safari specific fixes */
+  -webkit-overflow-scrolling: touch;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.gaming-container {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  padding: 20px;
+  overflow: hidden;
+  min-height: 0; /* Fix flex shrinking */
 }
 
-.App-link {
-  color: #61dafb;
+.gaming-card {
+  background: var(--card-bg);
+  border: 2px solid var(--border-primary);
+  border-radius: 16px;
+  box-shadow: var(--shadow-primary);
+  backdrop-filter: blur(10px);
+  position: relative;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+.gaming-button-primary {
+  background: var(--gradient-gold);
+  color: var(--primary-bg);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-primary);
+}
+
+.gaming-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(255, 215, 0, 0.25);
+}
+
+.gaming-button-secondary {
+  background: var(--accent-bg);
+  color: var(--text-gold);
+  border: 2px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.gaming-button-secondary:hover {
+  background: var(--border-primary);
+  color: var(--primary-bg);
+}
+
+.gaming-input {
+  background: var(--accent-bg);
+  border: 2px solid var(--border-secondary);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 12px 16px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.gaming-input:focus {
+  outline: none;
+  border-color: var(--border-primary);
+  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .gaming-container {
+    padding: 16px 12px;
+    justify-content: flex-start;
+    padding-top: 80px; /* Account for header */
   }
-  to {
-    transform: rotate(360deg);
+  
+  .gaming-card {
+    border-radius: 12px;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+  
+  .gaming-button-primary,
+  .gaming-button-secondary {
+    padding: 14px 20px;
+    font-size: 16px;
+    min-height: 44px; /* Touch target size */
+  }
+}
+
+/* iPhone specific optimizations */
+@media (max-width: 480px) {
+  .gaming-container {
+    padding: 12px 8px;
+    padding-top: 70px;
+    gap: 12px;
+  }
+  
+  .gaming-card {
+    border-radius: 8px;
+    margin: 0;
+    padding: 16px !important;
+    max-width: calc(100vw - 16px);
+    width: calc(100vw - 16px);
+    box-sizing: border-box;
+  }
+  
+  .gaming-button-primary,
+  .gaming-button-secondary {
+    padding: 16px 20px;
+    font-size: 16px;
+    min-height: 48px;
+    width: 100%;
+  }
+  
+  /* Text size adjustments for small screens */
+  .gaming-card h1,
+  .gaming-card h2,
+  .gaming-card h3 {
+    font-size: clamp(18px, 4vw, 24px);
+  }
+}
+
+/* iPhone 14/15 and smaller screens */
+@media (max-width: 414px) and (max-height: 896px) {
+  .gaming-container {
+    padding-top: 60px;
+    padding-bottom: 60px;
+  }
+  
+  .gaming-card {
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* iPhone SE and very small screens */
+@media (max-width: 375px) and (max-height: 667px) {
+  .gaming-container {
+    padding: 8px;
+    padding-top: 50px;
+    padding-bottom: 50px;
+  }
+  
+  .gaming-card {
+    padding: 12px !important;
+    max-height: calc(100vh - 120px);
+    font-size: 14px;
+  }
+  
+  .gaming-button-primary,
+  .gaming-button-secondary {
+    padding: 12px 16px;
+    font-size: 14px;
+    min-height: 44px;
+  }
+}
+
+/* Prevent scrolling */
+.no-scroll {
+  overflow: hidden;
+}
+
+/* Header Responsive Styles */
+.header-desktop-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-mobile-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .header-desktop-nav {
+    display: none;
+  }
+  
+  .header-mobile-toggle {
+    display: flex;
+  }
+  
+  .header-logo {
+    font-size: 20px !important;
+    letter-spacing: 2px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-logo {
+    font-size: 18px !important;
+    letter-spacing: 1px !important;
+  }
+  
+  .header-mobile-menu {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    background: var(--secondary-bg);
+    border-top: 1px solid var(--border-secondary);
+    padding: 16px;
+    box-shadow: var(--shadow-dark);
+    z-index: 999;
   }
 }

@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "alexio-b7a7c"
-  }
+    "default": "alexio-b7a7c",
+    "alexio": "alexio-b7a7c"
+  },
+  "targets": {},
+  "etags": {}
 }
