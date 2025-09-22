@@ -1,4 +1,4 @@
-// Firebase configuration and initialization for React Native
+// Firebase configuration and initialization for React Native & Web
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -7,7 +7,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDEaMGe3FuqoutV_wC64IcseZB91t5Esj4",
@@ -22,10 +22,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth with AsyncStorage persistence for React Native
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// Initialize Auth differently for web and mobile
+let auth;
+if (Platform.OS === 'web') {
+  // For web, use default auth initialization
+  auth = getAuth(app);
+} else {
+  // For React Native, use AsyncStorage persistence
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+}
 
 export { auth };
 export const db = getFirestore(app);
