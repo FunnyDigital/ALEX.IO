@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,9 +23,35 @@ export default function DiceRollScreen() {
   const [rolling, setRolling] = useState(false);
   const [rollAnimation] = useState(new Animated.Value(0));
 
+  // Fetch wallet balance on component mount
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const walletData = await apiService.getWallet();
+        setWallet(walletData);
+      } catch (error) {
+        console.log('Error fetching wallet:', error);
+      }
+    };
+
+    if (auth.currentUser) {
+      fetchWallet();
+    }
+  }, []);
+
   const handlePlay = async () => {
     if (!bet || isNaN(bet) || bet <= 0) {
       Alert.alert('Error', 'Please enter a valid bet amount');
+      return;
+    }
+
+    // Check if user has sufficient balance
+    if (wallet && parseFloat(bet) > wallet.balance) {
+      Alert.alert(
+        'Insufficient Balance', 
+        `Your balance is $${wallet.balance.toFixed(2)} but you're trying to bet $${parseFloat(bet).toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -49,19 +75,24 @@ export default function DiceRollScreen() {
         try {
           const res = await apiService.diceRoll(Number(bet), Number(guess));
           
-          setResult(res.data.result);
-          setWallet(res.data.wallet);
-          
-          if (res.data.result === guess) {
-            Alert.alert('🎉 You Won!', `You guessed correctly! Won ₦${bet * 5}!`);
+          if (res.data?.success) {
+            const { result, win, wallet } = res.data;
+            setResult(result);
+            setWallet(wallet);
+            
+            if (win) {
+              Alert.alert('🎉 You Won!', `You guessed correctly! Won ₦${bet * 5}!`);
+            } else {
+              Alert.alert('😔 You Lost', `The dice showed ${result}. Better luck next time!`);
+            }
           } else {
-            Alert.alert('😔 You Lost', `The dice showed ${res.data.result}. Better luck next time!`);
+            Alert.alert('Error', res.data?.message || 'Failed to place bet');
           }
           
           setRolling(false);
           rollAnimation.setValue(0);
         } catch (err) {
-          Alert.alert('Error', err.response?.data?.message || err.message || 'Error');
+          Alert.alert('Error', err.response?.data?.message || err.message || 'Network error');
           setRolling(false);
           rollAnimation.setValue(0);
         }

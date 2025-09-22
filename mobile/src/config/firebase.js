@@ -24,15 +24,20 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Auth differently for web and mobile
 let auth;
-if (Platform.OS === 'web') {
-  // For web, use default auth initialization
+try {
+  if (Platform.OS === 'web') {
+    // For web, use default auth initialization
+    auth = getAuth(app);
+  } else {
+    // For React Native, use AsyncStorage persistence
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
+  }
+} catch (error) {
+  // Fallback if initialization fails
   auth = getAuth(app);
-} else {
-  // For React Native, use AsyncStorage persistence
-  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage)
-  });
 }
 
 export { auth };

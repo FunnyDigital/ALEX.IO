@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,9 +25,35 @@ export default function CoinFlipScreen() {
   const [history, setHistory] = useState([]);
   const [flipAnimation] = useState(new Animated.Value(0));
 
+  // Fetch wallet balance on component mount
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const walletData = await apiService.getWallet();
+        setWallet(walletData);
+      } catch (error) {
+        console.log('Error fetching wallet:', error);
+      }
+    };
+
+    if (auth.currentUser) {
+      fetchWallet();
+    }
+  }, []);
+
   const handleFlip = async () => {
     if (!bet || isNaN(bet) || bet <= 0) {
       Alert.alert('Error', 'Please enter a valid bet amount');
+      return;
+    }
+
+    // Check if user has sufficient balance
+    if (wallet && parseFloat(bet) > wallet.balance) {
+      Alert.alert(
+        'Insufficient Balance', 
+        `Your balance is $${wallet.balance.toFixed(2)} but you're trying to bet $${parseFloat(bet).toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -50,10 +76,9 @@ export default function CoinFlipScreen() {
     ]).start();
 
     try {
-      // Simulate coin flip and call API
-      setTimeout(async () => {
-        const coinResult = Math.random() < 0.5 ? 'heads' : 'tails';
-        await handlePlay(coinResult);
+      // Keep animation delay for UX; actual result comes from server
+      setTimeout(() => {
+        handlePlay();
       }, 1000);
     } catch (err) {
       Alert.alert('Error', 'Failed to flip coin');
@@ -62,34 +87,35 @@ export default function CoinFlipScreen() {
     }
   };
 
-  const handlePlay = async (apiResult) => {
+  const handlePlay = async () => {
     try {
       const res = await apiService.coinFlip(parseFloat(bet), choice);
 
-      if (res.data.success) {
-        setResult(apiResult);
-        setWallet(res.data.wallet);
+      if (res.data?.success) {
+        const { result, win, wallet } = res.data;
+        setResult(result);
+        setWallet(wallet);
         setHistory([
           { 
             time: new Date().toLocaleTimeString(), 
             choice, 
-            result: apiResult, 
-            win: choice === apiResult, 
-            wallet: res.data.wallet 
+            result, 
+            win, 
+            wallet 
           }, 
           ...history.slice(0, 4)
         ]);
         
-        if (choice === apiResult) {
+        if (win) {
           Alert.alert('🎉 You Won!', `You won ₦${bet}!`);
         } else {
           Alert.alert('😔 You Lost', `Better luck next time!`);
         }
       } else {
-        Alert.alert('Error', res.data.error || 'Failed to place bet');
+        Alert.alert('Error', res.data?.message || 'Failed to place bet');
       }
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.error || 'Network error');
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Network error');
     } finally {
       setLoading(false);
       setSpinning(false);
@@ -185,7 +211,11 @@ export default function CoinFlipScreen() {
               Result: {result.charAt(0).toUpperCase() + result.slice(1)}
             </Text>
             {wallet !== null && (
-              <Text style={styles.balanceText}>Balance: ₦{wallet.toLocaleString()}</Text>
+              <Text style={styles.balanceText}>
+                Balance: ${typeof wallet === 'object' && wallet.balance !== undefined 
+                  ? wallet.balance.toFixed(2) 
+                  : wallet.toLocaleString()}
+              </Text>
             )}
           </View>
         )}

@@ -167,6 +167,13 @@ function TradeGamble() {
       setError('Enter a valid bet amount');
       return;
     }
+
+    // Check if user has sufficient balance
+    if (wallet && parseFloat(baseBet) > wallet) {
+      setError(`Insufficient balance! Your balance is $${wallet.toFixed(2)} but you're trying to bet $${parseFloat(baseBet).toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`);
+      return;
+    }
+
     // Use logged-in user's username
     const name = profile?.username || 'Player';
     const uid = auth.currentUser?.uid || null;

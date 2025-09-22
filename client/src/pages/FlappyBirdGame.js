@@ -242,7 +242,7 @@ function FlappyBirdGame() {
         setResult(null);
         setError('');
         if (wallet !== null && wager > wallet) {
-            setError('Insufficient balance');
+            setError(`Insufficient balance! Your balance is $${wallet.toFixed(2)} but you're trying to bet $${wager.toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`);
             return;
         }
         setGameState('playing');

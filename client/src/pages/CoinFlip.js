@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, TextField, LinearProgress, Snackbar, Alert } from '@mui/material';
 import axios from 'axios';
 import { auth } from '../firebase';
@@ -14,6 +14,27 @@ function CoinFlip() {
   const [spinning, setSpinning] = useState(false);
   const [history, setHistory] = useState([]);
   const [showSnackbar, setShowSnackbar] = useState(false);
+
+  // Fetch wallet balance on component mount
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const token = await user.getIdToken();
+        const response = await axios.get('/api/user/wallet', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setWallet(response.data);
+      } catch (error) {
+        console.log('Error fetching wallet:', error);
+      }
+    };
+
+    if (auth.currentUser) {
+      fetchWallet();
+    }
+  }, []);
 
   // Coin image component
   const CoinImage = (
@@ -32,6 +53,13 @@ function CoinFlip() {
   const handleFlip = async () => {
     if (!bet || isNaN(bet) || bet <= 0) {
       setError('Please enter a valid bet amount');
+      return;
+    }
+
+    // Check if user has sufficient balance
+    if (wallet && parseFloat(bet) > wallet.balance) {
+      setError(`Insufficient balance! Your balance is $${wallet.balance.toFixed(2)} but you're trying to bet $${parseFloat(bet).toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`);
+      setShowSnackbar(true);
       return;
     }
 
@@ -137,6 +165,27 @@ function CoinFlip() {
           >
             {CoinImage}
           </Box>
+          
+          {/* Wallet Balance Display */}
+          {wallet !== null && (
+            <Typography
+              sx={{
+                mb: 2,
+                textAlign: 'center',
+                color: 'var(--text-gold)',
+                fontWeight: 600,
+                fontSize: '1.1rem',
+                background: 'var(--accent-bg)',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-secondary)',
+              }}
+            >
+              Balance: ${typeof wallet === 'object' && wallet.balance !== undefined 
+                ? wallet.balance.toFixed(2) 
+                : wallet.toFixed(2)}
+            </Typography>
+          )}
           
           <TextField 
             label="Bet Amount" 

@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { auth, db } from '../config/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { apiService } from '../config/api';
 
 export default function WalletScreen() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -22,20 +23,31 @@ export default function WalletScreen() {
     try {
       const user = auth.currentUser;
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setProfile(userDoc.data());
-        }
+        // Use Firestore onSnapshot for live balance updates
+        const userRef = doc(db, 'users', user.uid);
+        const unsubscribe = onSnapshot(userRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setProfile(data);
+          }
+        });
+        setLoading(false);
+        return unsubscribe;
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProfile();
+    let unsubscribe;
+    fetchProfile().then((unsub) => {
+      if (unsub) unsubscribe = unsub;
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleWithdraw = async () => {
@@ -44,29 +56,17 @@ export default function WalletScreen() {
       return;
     }
 
-    if (!bankDetails.account_number || !bankDetails.bank_code) {
-      Alert.alert('Error', 'Please enter your bank details');
-      return;
-    }
-
     try {
-      const user = auth.currentUser;
-      const userRef = doc(db, 'users', user.uid);
+      const res = await apiService.withdrawWallet(Number(withdrawAmount));
       
-      if (profile.wallet < Number(withdrawAmount)) {
-        Alert.alert('Error', 'Insufficient balance');
-        return;
+      if (res.data?.wallet !== undefined) {
+        setWithdrawAmount('');
+        Alert.alert('Success', 'Withdrawal successful!');
+      } else {
+        Alert.alert('Error', res.data?.message || 'Withdrawal failed');
       }
-
-      await updateDoc(userRef, {
-        wallet: profile.wallet - Number(withdrawAmount)
-      });
-      
-      setProfile({ ...profile, wallet: profile.wallet - Number(withdrawAmount) });
-      setWithdrawAmount('');
-      Alert.alert('Success', 'Withdrawal request submitted successfully!');
     } catch (err) {
-      Alert.alert('Error', 'Withdrawal failed. Please try again.');
+      Alert.alert('Error', err.response?.data?.message || 'Withdrawal failed. Please try again.');
     }
   };
 
