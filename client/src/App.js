@@ -12,7 +12,7 @@ import Profile from './pages/Profile';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import { auth, db } from './firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 function AppShell() {
   const [balance, setBalance] = useState(null);
@@ -20,16 +20,26 @@ function AppShell() {
   const location = useLocation();
 
   useEffect(() => {
-    const fetchBalance = async () => {
+    let unsubscribe = null;
+    const attach = () => {
       const user = auth.currentUser;
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setBalance(userDoc.data().wallet);
-        }
+        const ref = doc(db, 'users', user.uid);
+        unsubscribe = onSnapshot(ref, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setBalance(typeof data.wallet === 'number' ? data.wallet : 0);
+          }
+        });
       }
     };
-    fetchBalance();
+    const remove = () => { if (typeof unsubscribe === 'function') unsubscribe(); };
+    const off = auth.onAuthStateChanged(() => {
+      remove();
+      attach();
+    });
+    attach();
+    return () => { remove(); off(); };
   }, [location]);
 
   const handleDeposit = () => {

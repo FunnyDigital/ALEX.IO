@@ -37,9 +37,12 @@ function DiceRoll() {
           }, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          
-          setResult(res.data.result);
-          setWallet(res.data.wallet);
+          if (res.data?.success) {
+            setResult(res.data.result);
+            setWallet(res.data.wallet);
+          } else {
+            setError(res.data?.message || 'Play failed');
+          }
           setRolling(false);
         } catch (err) {
           setError(err.response?.data?.message || err.message || 'Error');

@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import axios from 'axios';
 
 const TIME_OPTIONS = Array.from({ length: 10 }, (_, i) => 15 + i * 5); // 15, 20, ..., 60
 
@@ -250,19 +251,21 @@ function FlappyBirdGame() {
     const handleGameOver = async (win, time) => {
         setResult({ win, time });
         setGameState('gameOver');
-        // Update wallet in Firestore
-        const user = auth.currentUser;
-        if (user) {
-            const userRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userRef);
-            let newWallet = userDoc.data().wallet || 0;
-            if (win) {
-                newWallet += wager;
+        // Settle via backend to ensure atomic update
+        try {
+            const user = auth.currentUser;
+            if (!user) throw new Error('Not authenticated');
+            const token = await user.getIdToken();
+            const res = await axios.post('/api/games/flappy-bird', { bet: Number(wager), score: win ? 10 : 0 }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data?.success) {
+                setWallet(res.data.wallet);
             } else {
-                newWallet -= wager;
+                throw new Error(res.data?.message || 'Settlement failed');
             }
-            await updateDoc(userRef, { wallet: newWallet });
-            setWallet(newWallet);
+        } catch (e) {
+            setError(e.message || 'Settlement error');
         }
     };
 

@@ -17,17 +17,28 @@ const PaystackDeposit = ({ token, onDeposit }) => {
 
   const handleVerifyPayment = async (reference, amount) => {
     try {
-      // Here you would verify with Paystack if needed
-      // For demo, just update wallet in Firestore
       const user = auth.currentUser;
-      const userRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
-      const currentWallet = userDoc.data().wallet || 0;
-      await updateDoc(userRef, {
-        wallet: currentWallet + amount
+      if (!user) {
+        setMessage('Not authenticated');
+        setLoading(false);
+        return;
+      }
+      const token = await user.getIdToken();
+      const res = await fetch('/api/user/wallet/deposit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ reference, amount })
       });
-      setMessage('Deposit successful!');
-      if (onDeposit) onDeposit(currentWallet + amount);
+      const data = await res.json();
+      if (res.ok) {
+        setMessage('Deposit successful!');
+        if (onDeposit) onDeposit(data.wallet);
+      } else {
+        setMessage(data.message || 'Deposit failed.');
+      }
     } catch (err) {
       setMessage('Deposit failed.');
     }

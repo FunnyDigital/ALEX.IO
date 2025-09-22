@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Typography, Paper, Button, TextField, Divider } from '@mui/material';
 import PaystackDeposit from '../components/PaystackDeposit';
 import { auth, db } from '../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 function Wallet() {
@@ -32,16 +32,26 @@ function Wallet() {
     setWithdrawMsg('');
     try {
       const user = auth.currentUser;
-      const userRef = doc(db, 'users', user.uid);
-      if (profile.wallet < Number(withdrawAmount)) {
-        setWithdrawMsg('Insufficient balance');
+      if (!user) {
+        setWithdrawMsg('Not authenticated');
         return;
       }
-      await updateDoc(userRef, {
-        wallet: profile.wallet - Number(withdrawAmount)
+      const token = await user.getIdToken();
+      const res = await fetch('/api/user/wallet/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ amount: Number(withdrawAmount) })
       });
-      setProfile({ ...profile, wallet: profile.wallet - Number(withdrawAmount) });
-      setWithdrawMsg('Withdrawal successful!');
+      const data = await res.json();
+      if (res.ok) {
+        setProfile({ ...profile, wallet: data.wallet });
+        setWithdrawMsg('Withdrawal successful!');
+      } else {
+        setWithdrawMsg(data.message || 'Withdrawal failed.');
+      }
     } catch (err) {
       setWithdrawMsg('Withdrawal failed.');
     }

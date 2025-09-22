@@ -41,10 +41,9 @@ function CoinFlip() {
     setResult(null);
 
     try {
-      // Simulate coin flip
+      // Keep animation delay for UX; actual result comes from server
       setTimeout(() => {
-        const coinResult = Math.random() < 0.5 ? 'heads' : 'tails';
-        handlePlay(coinResult);
+        handlePlay();
       }, 1000);
     } catch (err) {
       setError('Failed to flip coin');
@@ -53,45 +52,48 @@ function CoinFlip() {
     }
   };
 
-  const handlePlay = async (apiResult) => {
+  const handlePlay = async () => {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error('Not authenticated');
-      
       const token = await user.getIdToken();
-      const res = await axios.post(`/api/games/coinflip`, { 
+      const res = await axios.post(`/api/games/coin-flip`, { 
         bet: parseFloat(bet), 
         choice 
-      }, { 
-        headers: { Authorization: `Bearer ${token}` } 
-      });
+      }, { headers: { Authorization: `Bearer ${token}` } });
 
-      if (res.data.success) {
-        setWallet(res.data.wallet);
-        setHistory([
-          { 
-            time: new Date().toLocaleTimeString(), 
-            choice, 
-            result: apiResult, 
-            win: choice === apiResult, 
-            wallet: res.data.wallet 
-          }, 
-          ...history.slice(0, 4)
-        ]);
+      if (res.data?.success) {
+        const { result, win, wallet } = res.data;
+        setWallet(wallet);
+        setHistory([{ 
+          time: new Date().toLocaleTimeString(), 
+          choice, 
+          result, 
+          win, 
+          wallet 
+        }, ...history.slice(0, 4)]);
+        setResult({ result, win });
+        setError('');
+        // Show snackbar only if play succeeded
+        setTimeout(() => {
+          setSpinning(false);
+          setShowSnackbar(true);
+        }, 1200);
       } else {
-        setError(res.data.message);
+        setResult(null);
+        setError(res.data?.message || 'Play failed');
+        setTimeout(() => {
+          setSpinning(false);
+        }, 1200);
       }
     } catch (err) {
+      setResult(null);
       setError(err.response?.data?.message || err.message || 'Error');
+      setTimeout(() => {
+        setSpinning(false);
+      }, 1200);
     }
-
     setLoading(false);
-    // Keep spinning for at least 1.2s, then show result
-    setTimeout(() => {
-      setResult(apiResult);
-      setSpinning(false);
-      setShowSnackbar(true);
-    }, 1200);
   };
 
   return (
@@ -306,16 +308,16 @@ function CoinFlip() {
           </Box>
           
           <Snackbar 
-            open={showSnackbar} 
+            open={showSnackbar && !!result} 
             autoHideDuration={2000} 
             onClose={() => setShowSnackbar(false)} 
             anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
           >
             <Alert 
-              severity={choice === result ? 'success' : 'error'} 
+              severity={result && result.win ? 'success' : 'error'} 
               sx={{ width: '100%' }}
             >
-              {choice === result ? 'Congratulations! You won the flip.' : 'Sorry, you lost the flip.'}
+              {result && result.win ? 'Congratulations! You won the flip.' : 'Sorry, you lost the flip.'}
             </Alert>
           </Snackbar>
         </div>

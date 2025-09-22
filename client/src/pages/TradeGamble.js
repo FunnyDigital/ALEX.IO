@@ -1,24 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Typography, Button, TextField, MenuItem } from '@mui/material';
+import axios from 'axios';
 
 import { rtdb, auth, db } from '../firebase';
 import { ref, onValue, set, push, update, serverTimestamp } from 'firebase/database';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 function TradeGamble() {
   const [profile, setProfile] = useState(null);
+  const [wallet, setWallet] = useState(null);
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+    let unsub = null;
+    const attach = () => {
+      const user = auth.currentUser;
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setProfile(userDoc.data());
-        }
-      } else {
-        setProfile(null);
+        const ref = doc(db, 'users', user.uid);
+        unsub = onSnapshot(ref, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setProfile(data);
+            setWallet(typeof data.wallet === 'number' ? data.wallet : 0);
+          }
+        });
       }
+    };
+    const remove = () => { if (typeof unsub === 'function') unsub(); };
+    const off = auth.onAuthStateChanged(() => {
+      remove();
+      attach();
     });
-    return () => unsubscribe();
+    attach();
+    return () => { remove(); off(); };
   }, []);
   // UI State
   const [baseBet, setBaseBet] = useState('');
@@ -119,6 +131,35 @@ function TradeGamble() {
     });
   }, [graphData]);
 
+  // Settle wallet for the current user's resolved trades
+  React.useEffect(() => {
+    const tradesRef = ref(rtdb, 'tradeGamble/trades');
+    const unsub = onValue(tradesRef, async (snapshot) => {
+      const val = snapshot.val();
+      const user = auth.currentUser;
+      if (!val || !user || !profile) return;
+      const entries = Object.entries(val);
+      for (const [key, trade] of entries) {
+        const mine = trade?.uid ? trade.uid === user.uid : (trade?.name && profile?.username && trade.name === profile.username);
+        if (mine && trade.resolved && !trade.settled && typeof trade.win === 'boolean') {
+          try {
+            const token = await user.getIdToken();
+            const res = await axios.post('/api/games/trade-gamble/settle', {
+              bet: Number(trade.bet),
+              win: !!trade.win,
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            if (res.data?.success) {
+              await update(ref(rtdb, `tradeGamble/trades/${key}`), { settled: true });
+            }
+          } catch (e) {
+            // ignore transient errors; will retry on next onValue
+          }
+        }
+      }
+    });
+    return () => unsub();
+  }, [profile]);
+
   // Start a trade (write to rtdb)
   const handleTrade = (type) => {
     setError('');
@@ -128,8 +169,10 @@ function TradeGamble() {
     }
     // Use logged-in user's username
     const name = profile?.username || 'Player';
+    const uid = auth.currentUser?.uid || null;
     const trade = {
       name,
+      uid,
       baseBet: Number(baseBet),
       bet: Number(baseBet),
       multiplier: 1,
@@ -137,6 +180,7 @@ function TradeGamble() {
       startIdx: graphData.length - 1,
       duration,
       resolved: false,
+      settled: false,
       win: null,
       profit: null,
       timestamp: serverTimestamp()
@@ -162,53 +206,51 @@ function TradeGamble() {
     }
   };
 
-  // Draw simple candlestick chart (always visible)
+  // Improved candlestick trading graph
   const renderGraph = () => {
     // Responsive width/height for mobile portrait
-    let width = 600, height = 320;
-    if (window.innerWidth < 600) {
-      width = window.innerWidth;
-      height = window.innerHeight * 0.4;
-    }
-    const candleCount = 30; // Fewer, larger candles
-    const data = graphData.slice(-candleCount - 1); // Need previous for open/close
-    const midValue = 3.75; // (0.5 + 7) / 2
+    let width = Math.min(900, window.innerWidth * 0.98);
+    let height = Math.max(260, Math.min(400, window.innerHeight * 0.4));
+    const candleCount = 40;
+    const data = graphData.slice(-candleCount - 1);
     const yMin = 0.5, yMax = 7;
     const yScale = v => height - ((v - yMin) / (yMax - yMin)) * height;
-    // Timestamps for x-axis
+    // X axis labels
     const now = new Date();
-    const timeLabels = Array.from({length: 6}, (_, i) => {
-      const t = new Date(now.getTime() - (5 - i) * (candleCount / 5) * 1000);
+    const timeLabels = Array.from({length: 7}, (_, i) => {
+      const t = new Date(now.getTime() - (6 - i) * (candleCount / 6) * 1000);
       return t.toLocaleTimeString([], {minute: '2-digit', second: '2-digit'});
     });
     // Candle width and spacing
-    const candleWidth = Math.max(18, width / (candleCount * 1.2));
+    const candleWidth = Math.max(10, width / (candleCount * 1.3));
     const candleSpacing = (width - candleWidth * candleCount) / (candleCount + 1);
     return (
-      <svg width={width} height={height + 30} style={{ width: '100%', height: '100%' }}>
-        <rect x={0} y={0} width={width} height={height} fill="#181a20" stroke="#e94f4f" strokeWidth={4} />
-        {/* Y axis lines and labels */}
+      <svg width={width} height={height + 40} style={{ width: '100%', height: '100%' }}>
+        {/* Background */}
+        <rect x={0} y={0} width={width} height={height} fill="#181a20" stroke="#444" strokeWidth={2} />
+        {/* Grid lines */}
+        {[...Array(8)].map((_, i) => {
+          const y = height - (i * height / 7);
+          return <line key={i} x1={0} y1={y} x2={width} y2={y} stroke="#333" strokeDasharray="4 4" />;
+        })}
         {[...Array(7)].map((_, i) => {
+          const x = i * width / 6;
+          return <line key={i} x1={x} y1={0} x2={x} y2={height} stroke="#333" strokeDasharray="4 4" />;
+        })}
+        {/* Y axis labels */}
+        {[...Array(8)].map((_, i) => {
           const y = height - (i * height / 7);
           const val = (yMin + ((yMax - yMin) * i / 7)).toFixed(2);
-          return (
-            <g key={i}>
-              <line x1={0} y1={y} x2={width} y2={y} stroke="#333" strokeDasharray="4 4" />
-              <text x={2} y={y - 2} fontSize="10" fill="#aaa">{val}</text>
-            </g>
-          );
+          return <text key={i} x={2} y={y - 2} fontSize="11" fill="#aaa">{val}</text>;
         })}
-        {/* Middle line */}
-        <line x1={0} y1={yScale(midValue)} x2={width} y2={yScale(midValue)} stroke="#fff" strokeDasharray="2 2" strokeWidth={2} />
         {/* X axis time labels */}
         {timeLabels.map((label, i) => (
-          <text key={i} x={i * width / 5} y={height + 18} fontSize="11" fill="#aaa" textAnchor="middle">{label}</text>
+          <text key={i} x={i * width / 6} y={height + 18} fontSize="12" fill="#aaa" textAnchor="middle">{label}</text>
         ))}
         {/* Candles with wicks */}
         {data.slice(1).map((v, i) => {
           const open = data[i];
           const close = data[i + 1];
-          // For a more realistic candle, use a small window for high/low
           const window = data.slice(Math.max(0, i - 1), i + 3);
           const high = Math.max(...window);
           const low = Math.min(...window);
@@ -221,32 +263,31 @@ function TradeGamble() {
           const yLow = yScale(low);
           // Candle body
           const bodyY = Math.min(yOpen, yClose);
-          const bodyH = Math.max(Math.abs(yOpen - yClose), 12); // Minimum body height
+          const bodyH = Math.max(Math.abs(yOpen - yClose), 8); // Minimum body height
           return (
             <g key={i}>
               {/* Wick */}
-              <rect x={x + candleWidth/2 - 1.5} y={yHigh} width={3} height={Math.max(2, yLow - yHigh)} fill="#444" rx={1.5} />
+              <rect x={x + candleWidth/2 - 1.2} y={yHigh} width={2.4} height={Math.max(2, yLow - yHigh)} fill="#bbb" rx={1.2} />
               {/* Body */}
-              <rect x={x} y={bodyY} width={candleWidth} height={bodyH} fill={color} stroke="#222" rx={4} />
+              <rect x={x} y={bodyY} width={candleWidth} height={bodyH} fill={color} stroke="#222" rx={3} />
             </g>
           );
         })}
         {/* Current value */}
-        <text x={width - 120} y={40} fontFamily="monospace" fontSize="2rem" fill="#fff">{data[data.length - 1]?.toFixed(4)}x</text>
+        <text x={width - 120} y={38} fontFamily="monospace" fontSize="2rem" fill="#fff">{data[data.length - 1]?.toFixed(4)}x</text>
+        {/* Y axis title */}
+        <text x={-height/2} y={16} fontSize="13" fill="#aaa" transform={`rotate(-90 0 16)`}>Multiplier (x)</text>
+        {/* X axis title */}
+        <text x={width/2} y={height + 36} fontSize="13" fill="#aaa" textAnchor="middle">Time</text>
       </svg>
     );
   };
 
   return (
-    <div className="gaming-page">
-      <div className="gaming-container" style={{ maxWidth: '900px', width: '100%' }}>
-        <div className="gaming-card" style={{
-          width: '100%',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 20
-        }}>
+    <div className="gaming-page" style={{ minHeight: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: 'var(--primary-bg)' }}>
+      <div className="gaming-container" style={{ width: '100%', maxWidth: 1400, display: 'flex', flexDirection: 'row', gap: 32, padding: '24px', boxSizing: 'border-box', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center' }}>
+        {/* Graph and Trades Side-by-side on large screens, stacked on mobile */}
+        <div style={{ flex: 2, minWidth: 340, maxWidth: 900, display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{
             color: 'var(--text-gold)',
             textAlign: 'center',
@@ -256,23 +297,30 @@ function TradeGamble() {
           }}>
             Trade Gamble
           </div>
-          
           {/* Graph Area */}
           <div style={{
             background: 'var(--accent-bg)',
             borderRadius: 12,
             border: '2px solid var(--border-primary)',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            minHeight: 320,
+            width: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}>
             {renderGraph()}
           </div>
-          
           {/* Current Trades */}
           <div style={{
             background: 'var(--accent-bg)',
             borderRadius: 12,
             border: '1px solid var(--border-secondary)',
-            padding: '16px'
+            padding: '16px',
+            minHeight: 120,
+            width: '100%',
+            boxSizing: 'border-box',
           }}>
             <Typography style={{ 
               fontWeight: 700, 
@@ -319,8 +367,9 @@ function TradeGamble() {
               </div>
             ))}
           </div>
-          
-          {/* Controls */}
+        </div>
+        {/* Controls on the right (or below on mobile) */}
+        <div style={{ flex: 1, minWidth: 320, maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{ 
             display: 'flex', 
             flexDirection: 'column', 
@@ -328,10 +377,13 @@ function TradeGamble() {
             background: 'var(--accent-bg)',
             padding: '20px',
             borderRadius: 12,
-            border: '1px solid var(--border-secondary)'
+            border: '1px solid var(--border-secondary)',
+            width: '100%',
+            boxSizing: 'border-box',
           }}>
             {/* Input Row */}
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {/* ...existing code for TextFields... */}
               <TextField 
                 label="Base Bet" 
                 type="number" 
@@ -442,7 +494,6 @@ function TradeGamble() {
                 {[1,2,5,10].map(d => <MenuItem key={d} value={d}>{d} min</MenuItem>)}
               </TextField>
             </div>
-            
             {/* Current Bet Display */}
             <div style={{ 
               textAlign: 'center', 
@@ -452,7 +503,6 @@ function TradeGamble() {
             }}>
               Current Bet: ${activeTrade ? activeTrade.bet : baseBet || 0}
             </div>
-            
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
               <Button 
@@ -504,9 +554,13 @@ function TradeGamble() {
                 SELL
               </Button>
             </div>
-            
-            {/* Status Display */}
-            <div style={{ textAlign: 'center' }}>
+            {/* Status Display + Wallet */}
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              {wallet !== null && (
+                <span style={{ color: 'var(--text-gold)', fontWeight: 700, fontSize: 18 }}>
+                  Wallet: ${wallet}
+                </span>
+              )}
               {activeTrade && !activeTrade.resolved && tradeTimer !== null && (
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                   Time left: <b style={{ color: 'var(--gold-primary)' }}>{tradeTimer}s</b>
