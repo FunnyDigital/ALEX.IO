@@ -14,13 +14,22 @@ if (!global._firebaseAdminInitialized) {
 const db = getFirestore();
 
 async function authMiddleware(req, res, next) {
+  console.log('Auth middleware called');
   const token = req.header('Authorization')?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ message: 'No token, authorization denied' });
+  console.log('Token present:', !!token);
+  
+  if (!token) {
+    console.log('No token provided');
+    return res.status(401).json({ message: 'No token, authorization denied' });
+  }
+  
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.user = decodedToken.uid;
+    console.log('Token verified for user:', req.user);
     next();
   } catch (err) {
+    console.error('Auth error:', err.message);
     res.status(401).json({ message: 'Token is not valid', error: err.message });
   }
 }
@@ -42,19 +51,31 @@ async function updateWalletTxn(userId, computeNewWallet) {
 
 // POST /api/games/coin-flip
 router.post('/coin-flip', authMiddleware, async (req, res) => {
+  console.log('Coin flip request received:', req.body);
+  console.log('User ID:', req.user);
   try {
     const { bet, choice } = req.body;
     const amount = Number(bet);
+    console.log('Processed bet:', amount, 'choice:', choice);
+    
     if (!amount || amount <= 0 || !['heads', 'tails'].includes(String(choice))) {
+      console.log('Invalid input validation failed');
       return res.status(400).json({ success: false, message: 'Invalid input' });
     }
+    
     const result = Math.random() < 0.5 ? 'heads' : 'tails';
     const win = choice === result;
+    console.log('Game result:', result, 'win:', win);
+    
     const out = await updateWalletTxn(req.user, (current) => {
+      console.log('Current wallet balance:', current);
       if (current < amount) throw new Error('Insufficient funds');
       const newWallet = win ? current + amount : current - amount;
+      console.log('New wallet balance:', newWallet);
       return { newWallet, payload: { result, win } };
     });
+    
+    console.log('Transaction completed:', out);
     res.json({ success: true, result, win, wallet: out.wallet });
   } catch (err) {
     console.error('Coin Flip Error:', err);

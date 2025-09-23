@@ -49,7 +49,7 @@ export default function App() {
   return (
     <>
       <StatusBar style="light" backgroundColor="#1a1a2e" />
-      <AppNavigator />
+      <AppNavigator user={user} />
     </>
   );
 }

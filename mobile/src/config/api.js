@@ -1,15 +1,16 @@
 import axios from 'axios';
 import { auth } from './firebase';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 
 // Use different base URLs for web and mobile
 const API_BASE_URL = Platform.OS === 'web' 
   ? 'http://localhost:5000'  // For web
   : 'http://10.0.2.2:5000';  // For Android emulator (use your IP for physical device)
 
-// Create axios instance
+// Create axios instance with timeout
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 10000, // 10 second timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,25 +19,41 @@ const api = axios.create({
 // Add request interceptor to include auth token
 api.interceptors.request.use(
   async (config) => {
+    console.log('Making API request:', config.method.toUpperCase(), config.url);
     const user = auth.currentUser;
     if (user) {
       const token = await user.getIdToken();
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('Added auth token to request');
+    } else {
+      console.log('No authenticated user found');
     }
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
 // Add response interceptor for error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API response received:', response.status, response.data);
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401) {
+    console.error('API error:', error.response?.status, error.response?.data, error.message);
+    if (error.code === 'ECONNABORTED') {
+      console.log('Request timeout');
+      Alert.alert('Error', 'Request timeout. Please check your connection and try again.');
+    } else if (error.response?.status === 401) {
       // Handle unauthorized access
       console.log('Unauthorized access - user may need to log in again');
+      Alert.alert('Error', 'Authentication failed. Please log in again.');
+    } else if (error.code === 'NETWORK_ERROR' || !error.response) {
+      console.log('Network error');
+      Alert.alert('Error', 'Network error. Please check your internet connection.');
     }
     return Promise.reject(error);
   }
@@ -67,10 +84,13 @@ export const apiService = {
   updateUserProfile: (profileData) => 
     api.put('/api/user/profile', profileData),
     
+  // Wallet API calls - Fixed function names
+  getWallet: () => 
+    api.get('/api/user/wallet'),
+    
   getUserWallet: () => 
     api.get('/api/user/wallet'),
     
-  // Wallet API calls
   depositWallet: (reference, amount) => 
     api.post('/api/user/wallet/deposit', { reference, amount }),
     

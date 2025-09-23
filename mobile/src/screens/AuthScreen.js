@@ -39,7 +39,7 @@ export default function AuthScreen({ navigation }) {
           await setDoc(userRef, {
             username: '',
             email: form.email,
-            wallet: 0,
+            wallet: 1000, // Give new users 1000 naira to start with
             createdAt: new Date().toISOString()
           });
         }
@@ -48,11 +48,11 @@ export default function AuthScreen({ navigation }) {
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           username: form.username,
           email: form.email,
-          wallet: 0,
+          wallet: 1000, // Give new users 1000 naira to start with
           createdAt: new Date().toISOString()
         });
       }
-      navigation.replace('Main');
+      // Navigation will be handled by App.js auth state change
     } catch (err) {
       Alert.alert('Error', err.message || 'Authentication failed');
     }

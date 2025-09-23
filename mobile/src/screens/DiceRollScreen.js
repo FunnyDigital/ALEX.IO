@@ -27,10 +27,13 @@ export default function DiceRollScreen() {
   useEffect(() => {
     const fetchWallet = async () => {
       try {
-        const walletData = await apiService.getWallet();
-        setWallet(walletData);
+        const response = await apiService.getWallet();
+        setWallet(response.data);
       } catch (error) {
         console.log('Error fetching wallet:', error);
+        if (error.code === 'ECONNABORTED') {
+          Alert.alert('Error', 'Request timeout while fetching balance. Please check your connection.');
+        }
       }
     };
 
@@ -48,7 +51,7 @@ export default function DiceRollScreen() {
     // Check if user has sufficient balance
     if (wallet && parseFloat(bet) > wallet.balance) {
       Alert.alert(
-        'Insufficient Balance', 
+        'Insufficient Balance',
         `Your balance is $${wallet.balance.toFixed(2)} but you're trying to bet $${parseFloat(bet).toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`,
         [{ text: 'OK' }]
       );
@@ -74,25 +77,44 @@ export default function DiceRollScreen() {
       setTimeout(async () => {
         try {
           const res = await apiService.diceRoll(Number(bet), Number(guess));
-          
+
           if (res.data?.success) {
             const { result, win, wallet } = res.data;
             setResult(result);
-            setWallet(wallet);
-            
+            setWallet({ balance: wallet });
+
+            // Always fetch the latest wallet from backend after game result
+            try {
+              const walletRes = await apiService.getWallet();
+              if (walletRes.data && typeof walletRes.data.balance !== 'undefined') {
+                setWallet(walletRes.data);
+              }
+            } catch (walletErr) {
+              console.error('Error fetching updated wallet:', walletErr);
+            }
+
             if (win) {
-              Alert.alert('🎉 You Won!', `You guessed correctly! Won ₦${bet * 5}!`);
+              Alert.alert('🎉 You Won!', `You guessed correctly! Won ₦${bet * 5}! New balance: ₦${wallet.toLocaleString()}`);
             } else {
-              Alert.alert('😔 You Lost', `The dice showed ${result}. Better luck next time!`);
+              Alert.alert('😔 You Lost', `The dice showed ${result}. You lost ₦${bet}. Balance: ₦${wallet.toLocaleString()}`);
             }
           } else {
             Alert.alert('Error', res.data?.message || 'Failed to place bet');
           }
-          
+
           setRolling(false);
           rollAnimation.setValue(0);
         } catch (err) {
-          Alert.alert('Error', err.response?.data?.message || err.message || 'Network error');
+          console.error('Dice roll error:', err);
+          if (err.code === 'ECONNABORTED') {
+            Alert.alert('Error', 'Request timeout. Please try again.');
+          } else if (err.response?.data?.message) {
+            Alert.alert('Error', err.response.data.message);
+          } else if (err.message) {
+            Alert.alert('Error', err.message);
+          } else {
+            Alert.alert('Error', 'Network error. Please check your connection.');
+          }
           setRolling(false);
           rollAnimation.setValue(0);
         }

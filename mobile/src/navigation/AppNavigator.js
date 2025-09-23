@@ -54,11 +54,11 @@ function MainTabNavigator() {
 }
 
 // Main Stack Navigator
-export default function AppNavigator() {
+export default function AppNavigator({ user }) {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Auth"
+        initialRouteName={user ? "Main" : "Auth"}
         screenOptions={{
           headerStyle: {
             backgroundColor: '#1a1a2e',
@@ -69,36 +69,41 @@ export default function AppNavigator() {
           },
         }}
       >
-        <Stack.Screen 
-          name="Auth" 
-          component={AuthScreen} 
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="Main" 
-          component={MainTabNavigator} 
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="CoinFlip" 
-          component={CoinFlipScreen}
-          options={{ title: 'Coin Flip' }}
-        />
-        <Stack.Screen 
-          name="DiceRoll" 
-          component={DiceRollScreen}
-          options={{ title: 'Dice Roll' }}
-        />
-        <Stack.Screen 
-          name="TradeGamble" 
-          component={TradeGambleScreen}
-          options={{ title: 'Trade Gamble' }}
-        />
-        <Stack.Screen 
-          name="FlappyBird" 
-          component={FlappyBirdScreen}
-          options={{ title: 'Flappy Bird' }}
-        />
+        {!user ? (
+          <Stack.Screen 
+            name="Auth" 
+            component={AuthScreen} 
+            options={{ headerShown: false }}
+          />
+        ) : (
+          <>
+            <Stack.Screen 
+              name="Main" 
+              component={MainTabNavigator} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="CoinFlip" 
+              component={CoinFlipScreen}
+              options={{ title: 'Coin Flip' }}
+            />
+            <Stack.Screen 
+              name="DiceRoll" 
+              component={DiceRollScreen}
+              options={{ title: 'Dice Roll' }}
+            />
+            <Stack.Screen 
+              name="TradeGamble" 
+              component={TradeGambleScreen}
+              options={{ title: 'Trade Gamble' }}
+            />
+            <Stack.Screen 
+              name="FlappyBird" 
+              component={FlappyBirdScreen}
+              options={{ title: 'Flappy Bird' }}
+            />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

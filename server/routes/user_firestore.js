@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
 const axios = require('axios');
 const { initializeApp, applicationDefault } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
@@ -13,17 +13,37 @@ if (!global._firebaseAdminInitialized) {
 }
 const db = getFirestore();
 
-function authMiddleware(req, res, next) {
+// Updated auth middleware using Firebase Admin SDK
+async function authMiddleware(req, res, next) {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ message: 'No token, authorization denied' });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded.id;
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken.uid;
     next();
   } catch (err) {
-    res.status(401).json({ message: 'Token is not valid' });
+    console.error('Auth error:', err);
+    res.status(401).json({ message: 'Token is not valid', error: err.message });
   }
 }
+
+// GET /api/user/wallet
+router.get('/wallet', authMiddleware, async (req, res) => {
+  try {
+    const userRef = db.collection('users').doc(req.user);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+      // Create user if doesn't exist
+      await userRef.set({ wallet: 0, createdAt: new Date() });
+      return res.json({ balance: 0 });
+    }
+    const user = userDoc.data();
+    res.json({ balance: user.wallet || 0 });
+  } catch (err) {
+    console.error('Wallet fetch error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 // GET /api/user/wallet/debug
 router.get('/wallet/debug', authMiddleware, async (req, res) => {
   try {

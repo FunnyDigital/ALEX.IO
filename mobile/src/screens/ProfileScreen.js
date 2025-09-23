@@ -12,6 +12,7 @@ import {
 import { auth, db } from '../config/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { Platform } from 'react-native';
 
 export default function ProfileScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
@@ -67,25 +68,36 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut(auth);
-              navigation.replace('Auth');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to logout');
-            }
+    if (Platform.OS === 'web') {
+      // On web, Alert.alert does nothing, so log out immediately
+      try {
+        await signOut(auth);
+        navigation.replace('Auth');
+      } catch (error) {
+        // Optionally show a message in the UI
+        console.error('Failed to logout', error);
+      }
+    } else {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await signOut(auth);
+                navigation.replace('Auth');
+              } catch (error) {
+                Alert.alert('Error', 'Failed to logout');
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   if (loading) {
