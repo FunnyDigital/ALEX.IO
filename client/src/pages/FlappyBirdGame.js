@@ -2,13 +2,17 @@ import React, { useRef, useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import axios from 'axios';
+import './FlappyBirdGame.css';
 
 const TIME_OPTIONS = Array.from({ length: 10 }, (_, i) => 15 + i * 5); // 15, 20, ..., 60
 
 function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
     const canvasRef = useRef(null);
     const [running, setRunning] = useState(true);
+    const [gameOver, setGameOver] = useState(false);
     const [elapsed, setElapsed] = useState(0);
+    const [score, setScore] = useState(0);
+    const [multiplier, setMultiplier] = useState(1);
     const requestRef = useRef();
     const timerRef = useRef();
 
@@ -19,7 +23,7 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
     const bird = useRef({ x: 60, y: 200, vy: 0, width: 32, height: 32 });
     const pipes = useRef([]);
     const gravity = 0.5;
-    const lift = -8.5;
+    const lift = -7.5; // Reduced from -8.5 for better control
     const pipeGap = 140;
     const pipeWidth = 52;
     const pipeSpeed = 2.8;
@@ -43,9 +47,9 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
     useEffect(() => {
         let lastJump = 0;
         function jump(e) {
-            // Only allow jump every 80ms for smoothness
+            // Only allow jump every 120ms for better control
             const now = Date.now();
-            if (now - lastJump < 80) return;
+            if (now - lastJump < 120) return;
             if (e.type === 'keydown' && e.code !== 'Space') return;
             bird.current.vy = lift;
             lastJump = now;
@@ -83,20 +87,20 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
             ctx.strokeStyle = '#a16207';
             ctx.lineWidth = 2;
             ctx.stroke();
-            // Eye
+            // Eye - positioned more to the right for forward-looking
             ctx.beginPath();
-            ctx.arc(bird.current.x + 22, bird.current.y + 12, 3, 0, 2 * Math.PI);
+            ctx.arc(bird.current.x + 24, bird.current.y + 11, 3, 0, 2 * Math.PI);
             ctx.fillStyle = '#fff';
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(bird.current.x + 23, bird.current.y + 12, 1.2, 0, 2 * Math.PI);
+            ctx.arc(bird.current.x + 25, bird.current.y + 11, 1.2, 0, 2 * Math.PI);
             ctx.fillStyle = '#23243a';
             ctx.fill();
-            // Beak
+            // Beak - positioned more to the right for forward direction
             ctx.beginPath();
             ctx.moveTo(bird.current.x + 32, bird.current.y + 16);
-            ctx.lineTo(bird.current.x + 38, bird.current.y + 13);
-            ctx.lineTo(bird.current.x + 38, bird.current.y + 19);
+            ctx.lineTo(bird.current.x + 40, bird.current.y + 14);
+            ctx.lineTo(bird.current.x + 40, bird.current.y + 18);
             ctx.closePath();
             ctx.fillStyle = '#ffb300';
             ctx.fill();
@@ -165,13 +169,15 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
             // Collision
             if (collision()) {
                 setRunning(false);
-                onGameOver(false, elapsed);
+                setGameOver(true);
+                onGameOver(false, elapsed, score, multiplier);
                 return;
             }
             // Win
             if (elapsed >= targetTime) {
                 setRunning(false);
-                onGameOver(true, elapsed);
+                setGameOver(true);
+                onGameOver(true, elapsed, score, multiplier);
                 return;
             }
             requestRef.current = requestAnimationFrame(step);
@@ -181,8 +187,15 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
         requestRef.current = requestAnimationFrame(step);
         timerRef.current = setInterval(() => {
             setElapsed(e => {
-                if (setElapsedExternal) setElapsedExternal(e + 1);
-                return e + 1;
+                const newElapsed = e + 1;
+                if (setElapsedExternal) setElapsedExternal(newElapsed);
+                
+                // Calculate multiplier based on time milestones (every 5 seconds)
+                if (newElapsed > 0 && newElapsed % 5 === 0) {
+                    setMultiplier(prev => prev + 0.5);
+                }
+                
+                return newElapsed;
             });
         }, 1000);
         return () => {
@@ -194,6 +207,27 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'manipulation', width: '100%', gap: 12 }}>
+            {/* Game HUD */}
+            {running && !gameOver && (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    width: '100%',
+                    maxWidth: 400,
+                    padding: '10px 15px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold'
+                }}>
+                    <div>Score: {score}</div>
+                    <div>Multiplier: {multiplier.toFixed(1)}x</div>
+                    <div>Time: {Math.floor(elapsed)}s</div>
+                </div>
+            )}
+            
             <canvas
                 ref={canvasRef}
                 width={canvasSize.w}
@@ -248,17 +282,33 @@ function FlappyBirdGame() {
         setGameState('playing');
     };
 
-    const handleGameOver = async (win, time) => {
-        setResult({ win, time });
+    const handleGameOver = async (completed, timeSurvived, score, multiplier = 1) => {
+        setResult({ win: completed, time: timeSurvived, score, multiplier });
         setGameState('gameOver');
+        
+        // Calculate total winnings based on time milestones
+        const totalWinnings = completed ? Number(wager) * multiplier : 0;
+        
         // Settle via backend to ensure atomic update
         try {
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated');
             const token = await user.getIdToken();
-            const res = await axios.post('/api/games/flappy-bird', { bet: Number(wager), score: win ? 10 : 0 }, {
+            
+            const gameData = {
+                bet: Number(wager),
+                completed,
+                timeTarget: Number(targetTime),
+                timeSurvived,
+                score,
+                multiplier,
+                totalWinnings
+            };
+            
+            const res = await axios.post('/api/games/flappy-bird', gameData, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            
             if (res.data?.success) {
                 setWallet(res.data.wallet);
             } else {

@@ -68,8 +68,8 @@ export const apiService = {
   diceRoll: (bet, guess) => 
     api.post('/api/games/dice-roll', { bet, guess }),
     
-  flappyBird: (bet, score) =>
-    api.post('/api/games/flappy-bird', { bet, score }),
+  flappyBird: (gameData) =>
+    api.post('/api/games/flappy-bird', gameData),
     
   tradeGamble: (bet, direction, duration) =>
     api.post('/api/games/trade-gamble', { bet, direction, duration }),

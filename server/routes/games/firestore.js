@@ -1,13 +1,46 @@
 const express = require('express');
 const router = express.Router();
-const { initializeApp, applicationDefault } = require('firebase-admin/app');
+const { initializeApp, applicationDefault, cert } = require('firebase-admin/app');
 const { getFirestore, getAuth } = require('firebase-admin/firestore');
 const admin = require('firebase-admin');
+const fs = require('fs');
+const path = require('path');
 
 // Initialize Firebase Admin SDK (ensure only once)
 if (!global._firebaseAdminInitialized) {
+  let credential;
+  
+  // Check if service account key file exists
+  const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (serviceAccountPath && fs.existsSync(path.resolve(serviceAccountPath))) {
+    console.log('Using service account credentials from file');
+    credential = applicationDefault();
+  } else {
+    console.log('Service account file not found, using environment variables');
+    // Use environment variables for Firebase config
+    const serviceAccount = {
+      type: "service_account",
+      project_id: process.env.FIREBASE_PROJECT_ID || "alexio-b7a7c",
+      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+      client_id: process.env.FIREBASE_CLIENT_ID,
+      auth_uri: "https://accounts.google.com/o/oauth2/auth",
+      token_uri: "https://oauth2.googleapis.com/token",
+      auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs"
+    };
+    
+    // Check if we have the required environment variables
+    if (serviceAccount.private_key && serviceAccount.client_email) {
+      credential = cert(serviceAccount);
+    } else {
+      throw new Error('Firebase credentials not found. Please provide either a service account file or environment variables.');
+    }
+  }
+  
   initializeApp({
-    credential: applicationDefault(),
+    credential: credential,
+    projectId: process.env.FIREBASE_PROJECT_ID || "alexio-b7a7c"
   });
   global._firebaseAdminInitialized = true;
 }
@@ -157,19 +190,61 @@ router.post('/trade-gamble/settle', authMiddleware, async (req, res) => {
 // POST /api/games/flappy-bird
 router.post('/flappy-bird', authMiddleware, async (req, res) => {
   try {
-    const { bet, score } = req.body;
+    const { bet, completed, timeTarget, timeSurvived, score, multiplier, totalWinnings } = req.body;
+    
+    console.log('Flappy Bird game data:', req.body);
+    
     const amount = Number(bet);
-    if (!amount || amount <= 0 || typeof score !== 'number' || score < 0) {
-      return res.status(400).json({ success: false, message: 'Invalid input' });
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid bet amount' });
     }
-    const win = score >= 10;
-    const delta = win ? amount * 2 : -amount;
+    
+    if (typeof completed !== 'boolean' || !timeTarget || timeSurvived < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid game data' });
+    }
+    
+    // Calculate winnings based on completion and multiplier
+    let delta;
+    let winnings = 0;
+    
+    if (completed) {
+      // Player completed the target time - they win!
+      winnings = amount * (multiplier || 1); // Bet amount × multiplier
+      delta = winnings; // Add winnings to wallet
+    } else {
+      // Player failed - they lose only the bet amount
+      delta = -amount; // Subtract bet amount from wallet
+      winnings = 0;
+    }
+    
     const out = await updateWalletTxn(req.user, (current) => {
       if (current < amount) throw new Error('Insufficient funds');
       const newWallet = current + delta;
-      return { newWallet, payload: { win } };
+      return { 
+        newWallet, 
+        payload: { 
+          win: completed, 
+          winnings,
+          timeSurvived,
+          timeTarget,
+          score,
+          multiplier: multiplier || 1
+        } 
+      };
     });
-    res.json({ success: true, win, wallet: out.wallet });
+    
+    console.log('Flappy Bird result:', { completed, winnings, newWallet: out.wallet });
+    
+    res.json({ 
+      success: true, 
+      win: completed, 
+      winnings,
+      wallet: out.wallet,
+      timeSurvived,
+      timeTarget,
+      score,
+      multiplier: multiplier || 1
+    });
   } catch (err) {
     console.error('Flappy Bird Error:', err);
     const message = err.message === 'User not found' || err.message === 'Insufficient funds' ? err.message : 'Server error';
