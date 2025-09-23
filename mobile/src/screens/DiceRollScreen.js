@@ -214,8 +214,8 @@ export default function DiceRollScreen() {
             ]}>
               {result === guess ? 'YOU WON!' : 'YOU LOST'}
             </Text>
-            {wallet !== null && (
-              <Text style={styles.balanceText}>Balance: ₦{wallet.toLocaleString()}</Text>
+            {wallet && typeof wallet.balance !== 'undefined' && (
+              <Text style={styles.balanceText}>Balance: ₦{wallet.balance.toLocaleString()}</Text>
             )}
           </View>
         )}
