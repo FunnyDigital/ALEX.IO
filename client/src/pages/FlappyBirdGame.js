@@ -175,6 +175,7 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
             }
             // Win
             if (elapsed >= targetTime) {
+                console.log(`Game should end! elapsed: ${elapsed}, target: ${targetTime}`);
                 setRunning(false);
                 setGameOver(true);
                 onGameOver(true, elapsed, score, multiplier);
@@ -188,12 +189,11 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
         timerRef.current = setInterval(() => {
             setElapsed(e => {
                 const newElapsed = e + 1;
+                console.log(`Timer tick: ${newElapsed}s, target: ${targetTime}s`);
                 if (setElapsedExternal) setElapsedExternal(newElapsed);
                 
-                // Calculate multiplier based on time milestones (every 5 seconds)
-                if (newElapsed > 0 && newElapsed % 5 === 0) {
-                    setMultiplier(prev => prev + 0.5);
-                }
+                // Calculate multiplier based on time milestones (every 1 second)
+                setMultiplier(prev => prev + 0.5);
                 
                 return newElapsed;
             });
