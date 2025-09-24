@@ -103,7 +103,8 @@ router.post('/coin-flip', authMiddleware, async (req, res) => {
     const out = await updateWalletTxn(req.user, (current) => {
       console.log('Current wallet balance:', current);
       if (current < amount) throw new Error('Insufficient funds');
-      const newWallet = win ? current + amount : current - amount;
+      const payout = win ? amount : -amount; // Win: get bet back (net +amount), Lose: lose bet (net -amount)
+      const newWallet = current + payout;
       console.log('New wallet balance:', newWallet);
       return { newWallet, payload: { result, win } };
     });
@@ -156,7 +157,8 @@ router.post('/trade-gamble', authMiddleware, async (req, res) => {
     const win = Math.random() < 0.5;
     const out = await updateWalletTxn(req.user, (current) => {
       if (current < amount) throw new Error('Insufficient funds');
-      const newWallet = win ? current + amount : current - amount;
+      const payout = win ? amount : -amount; // Win: net +amount, Lose: net -amount
+      const newWallet = current + payout;
       return { newWallet, payload: { win } };
     });
     res.json({ success: true, win, wallet: out.wallet });
@@ -177,7 +179,8 @@ router.post('/trade-gamble/settle', authMiddleware, async (req, res) => {
     }
     const out = await updateWalletTxn(req.user, (current) => {
       if (current < amount && !win) throw new Error('Insufficient funds');
-      const newWallet = win ? current + amount : current - amount;
+      const payout = win ? amount : -amount; // Win: net +amount, Lose: net -amount
+      const newWallet = current + payout;
       return { newWallet, payload: { win } };
     });
     res.json({ success: true, win, wallet: out.wallet });
@@ -210,7 +213,7 @@ router.post('/flappy-bird', authMiddleware, async (req, res) => {
     if (completed) {
       // Player completed the target time - they win!
       winnings = amount * (multiplier || 1); // Bet amount × multiplier
-      delta = winnings; // Add winnings to wallet
+      delta = -amount + winnings; // Subtract bet, add winnings (net profit)
     } else {
       // Player failed - they lose only the bet amount
       delta = -amount; // Subtract bet amount from wallet

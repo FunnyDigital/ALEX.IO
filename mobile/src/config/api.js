@@ -4,13 +4,13 @@ import { Platform, Alert } from 'react-native';
 
 // Use different base URLs for web and mobile
 const API_BASE_URL = Platform.OS === 'web' 
-  ? 'http://localhost:5000'  // For web
+  ? 'http://127.0.0.1:5000'  // For web - use 127.0.0.1 to match server
   : 'http://10.0.2.2:5000';  // For Android emulator (use your IP for physical device)
 
-// Create axios instance with timeout
+// Create axios instance with longer timeout
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // Increased to 30 second timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -45,15 +45,21 @@ api.interceptors.response.use(
   (error) => {
     console.error('API error:', error.response?.status, error.response?.data, error.message);
     if (error.code === 'ECONNABORTED') {
-      console.log('Request timeout');
-      Alert.alert('Error', 'Request timeout. Please check your connection and try again.');
+      console.log('Request timeout - server may be slow or unavailable');
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', 'Request timeout. Please check your connection and try again.');
+      }
     } else if (error.response?.status === 401) {
       // Handle unauthorized access
       console.log('Unauthorized access - user may need to log in again');
-      Alert.alert('Error', 'Authentication failed. Please log in again.');
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', 'Authentication failed. Please log in again.');
+      }
     } else if (error.code === 'NETWORK_ERROR' || !error.response) {
-      console.log('Network error');
-      Alert.alert('Error', 'Network error. Please check your internet connection.');
+      console.log('Network error - server may not be running');
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', 'Network error. Please check your internet connection.');
+      }
     }
     return Promise.reject(error);
   }

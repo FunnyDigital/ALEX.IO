@@ -9,20 +9,28 @@ import {
   Animated,
   TextInput,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { apiService } from '../config/api';
 import { auth } from '../config/firebase';
 
 const { width, height } = Dimensions.get('window');
+// Use smaller dimensions for web to fit in the boxed container
+const gameWidth = Platform.OS === 'web' ? 800 : width;
+const gameHeight = Platform.OS === 'web' ? 600 : height;
 const BIRD_SIZE = 30;
 const PIPE_WIDTH = 50;
-const PIPE_GAP = 150;
-const GRAVITY = 0.6;
-const JUMP_FORCE = -8; // Reduced from -12 for better control
+const PIPE_GAP = 150; // Increased from 150 to make it easier
+const GRAVITY = 0.3; // Increased from 0.4 to make it easier
+const JUMP_FORCE = -4; // Increased from -8 for stronger jumps
 
 export default function FlappyBirdScreen({ navigation }) {
+  // Error handling
+  const [error, setError] = useState(null);
+  
   // Game States
-  const [gameState, setGameState] = useState('menu'); // 'menu', 'playing', 'gameOver'
+  const [gameState, setGameState] = useState('menu'); // 'menu', 'countdown', 'playing', 'gameOver', 'celebrating', 'lost'
+  const [countdown, setCountdown] = useState(3);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(30);
   const [targetTime, setTargetTime] = useState(30);
@@ -30,9 +38,10 @@ export default function FlappyBirdScreen({ navigation }) {
   const [wallet, setWallet] = useState(null);
   const [multiplier, setMultiplier] = useState(1);
   const [totalWinnings, setTotalWinnings] = useState(0);
+  const [gameResult, setGameResult] = useState(null); // Store game result for celebration/loss screen
   
   // Game Objects
-  const [bird, setBird] = useState({ x: 50, y: height / 2, velocity: 0 });
+  const [bird, setBird] = useState({ x: 50, y: gameHeight / 2, velocity: 0 });
   const [pipes, setPipes] = useState([]);
   const [background, setBackground] = useState({ x: 0 });
   
@@ -42,7 +51,12 @@ export default function FlappyBirdScreen({ navigation }) {
   const birdRef = useRef(bird);
   const pipesRef = useRef(pipes);
   const backgroundRef = useRef(background);
+  
+  // Animation refs for celebration/loss effects
+  const celebrationAnim = useRef(new Animated.Value(0)).current;
+  const confettiAnim = useRef(new Animated.Value(0)).current;
   const lastJumpRef = useRef(0); // Add jump throttling
+  const pulseAnim = useRef(new Animated.Value(1)).current; // Animation for countdown
 
   // Time options (15s to 60s)
   const timeOptions = Array.from({ length: 10 }, (_, i) => 15 + i * 5);
@@ -51,15 +65,31 @@ export default function FlappyBirdScreen({ navigation }) {
   useEffect(() => {
     const fetchWallet = async () => {
       try {
-        const walletData = await apiService.getWallet();
-        setWallet(walletData);
+        setError(null);
+        console.log('Fetching wallet data...');
+        const response = await apiService.getWallet();
+        console.log('Wallet response:', response);
+        setWallet(response.data || response);
       } catch (error) {
         console.log('Error fetching wallet:', error);
+        const errorMessage = error.code === 'ECONNABORTED' 
+          ? 'Server connection timeout. Please try again.'
+          : error.message?.includes('Network Error')
+          ? 'Cannot connect to server. Please make sure the backend is running.'
+          : 'Failed to load wallet data';
+        setError(errorMessage);
+        setWallet({ balance: 0 }); // Set default wallet
       }
     };
 
+    // Only try to fetch wallet if we have an authenticated user
     if (auth.currentUser) {
+      console.log('Authenticated user found, fetching wallet...');
       fetchWallet();
+    } else {
+      console.log('No authenticated user, setting demo mode');
+      setWallet({ balance: 0 });
+      setBet('0'); // Default to demo mode for unauthenticated users
     }
   }, []);
 
@@ -76,32 +106,95 @@ export default function FlappyBirdScreen({ navigation }) {
     backgroundRef.current = background;
   }, [background]);
 
+  // Add keyboard support for web
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleKeyPress = (event) => {
+        if (event.code === 'Space' || event.key === ' ') {
+          event.preventDefault(); // Prevent page scroll
+          jump();
+        }
+      };
+
+      // Add event listener
+      document.addEventListener('keydown', handleKeyPress);
+
+      // Cleanup event listener
+      return () => {
+        document.removeEventListener('keydown', handleKeyPress);
+      };
+    }
+  }, [gameState]); // Re-add listener when game state changes
+
   const startGame = () => {
-    if (!bet || isNaN(bet) || bet <= 0) {
-      Alert.alert('Error', 'Please enter a valid bet amount');
+    // Allow demo mode with bet = 0
+    if (bet !== '0' && (!bet || isNaN(bet) || bet <= 0)) {
+      const message = 'Please enter a valid bet amount or play in demo mode';
+      if (Platform.OS === 'web') {
+        console.log('Error:', message);
+        setError(message);
+      } else {
+        Alert.alert('Error', message);
+      }
       return;
     }
 
-    // Check if user has sufficient balance
-    if (wallet && parseFloat(bet) > wallet.balance) {
-      Alert.alert(
-        'Insufficient Balance', 
-        `Your balance is $${wallet.balance.toFixed(2)} but you're trying to bet $${parseFloat(bet).toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`,
-        [{ text: 'OK' }]
-      );
+    // Check if user has sufficient balance (skip for demo mode)
+    if (bet !== '0' && wallet && parseFloat(bet) > wallet.balance) {
+      const message = `Your balance is $${wallet.balance.toFixed(2)} but you're trying to bet $${parseFloat(bet).toFixed(2)}. Please reduce your bet amount or add funds to your wallet.`;
+      if (Platform.OS === 'web') {
+        console.log('Insufficient Balance:', message);
+        setError(message);
+      } else {
+        Alert.alert('Insufficient Balance', message, [{ text: 'OK' }]);
+      }
       return;
     }
 
-    // Reset game state
-    setGameState('playing');
+    // Reset game state and start countdown
+    setGameState('countdown');
+    setCountdown(3);
     setScore(0);
     setTimeLeft(targetTime);
     setMultiplier(1);
     setTotalWinnings(0);
-    setBird({ x: 50, y: height / 2, velocity: 0 });
+    setBird({ x: 50, y: gameHeight / 2, velocity: 0 });
     setPipes([]);
     setBackground({ x: 0 });
 
+    // Start countdown timer
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        // Trigger pulse animation for each countdown number
+        if (prev > 0) {
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.5,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }
+        
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          // Start actual game
+          setGameState('playing');
+          startGameTimer();
+          startGameLoop();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const startGameTimer = () => {
     // Start game timer
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
@@ -109,12 +202,18 @@ export default function FlappyBirdScreen({ navigation }) {
           endGame(true); // Time completed successfully
           return 0;
         }
+        
+        // Increase multiplier every second (0.5x per second)
+        const timeSurvived = targetTime - prev + 1;
+        if (timeSurvived > 0) {
+          const newMultiplier = 1 + (timeSurvived * 0.5);
+          console.log(`Time survived: ${timeSurvived}s, New multiplier: ${newMultiplier}x`);
+          setMultiplier(newMultiplier);
+        }
+        
         return prev - 1;
       });
     }, 1000);
-
-    // Start game loop
-    startGameLoop();
   };
 
   const startGameLoop = () => {
@@ -130,7 +229,7 @@ export default function FlappyBirdScreen({ navigation }) {
       const newY = prevBird.y + newVelocity;
       
       // Check ground/ceiling collision
-      if (newY <= 0 || newY >= height - BIRD_SIZE - 100) {
+      if (newY <= 30 || newY >= gameHeight - BIRD_SIZE - 100) {
         endGame(false); // Collision
         return prevBird;
       }
@@ -157,13 +256,13 @@ export default function FlappyBirdScreen({ navigation }) {
       newPipes = newPipes.filter(pipe => pipe.x + PIPE_WIDTH > 0);
       
       // Add new pipes
-      if (newPipes.length === 0 || newPipes[newPipes.length - 1].x < width - 200) {
-        const pipeHeight = Math.random() * (height - PIPE_GAP - 200) + 100;
+      if (newPipes.length === 0 || newPipes[newPipes.length - 1].x < gameWidth - 300) {
+        const pipeHeight = Math.random() * (gameHeight - PIPE_GAP - 200) + 100;
         newPipes.push({
-          x: width,
+          x: gameWidth,
           topHeight: pipeHeight,
           bottomY: pipeHeight + PIPE_GAP,
-          bottomHeight: height - pipeHeight - PIPE_GAP - 100,
+          bottomHeight: gameHeight - pipeHeight - PIPE_GAP - 100,
           passed: false
         });
       }
@@ -174,14 +273,6 @@ export default function FlappyBirdScreen({ navigation }) {
         if (!pipe.passed && birdRef.current.x > pipe.x + PIPE_WIDTH) {
           pipe.passed = true;
           setScore(prev => prev + 1);
-          
-          // Check for time milestones (every 5 seconds survived = bonus)
-          const currentTime = targetTime - timeLeft;
-          if (currentTime > 0 && currentTime % 5 === 0) {
-            const bonus = parseFloat(bet) * 0.5;
-            setMultiplier(prev => prev + 0.5);
-            setTotalWinnings(prev => prev + bonus);
-          }
         }
         
         // Check collision
@@ -214,14 +305,61 @@ export default function FlappyBirdScreen({ navigation }) {
   };
 
   const endGame = async (completed) => {
-    setGameState('gameOver');
+    console.log('=== GAME ENDING ===');
+    console.log('Completed:', completed);
+    console.log('Current bet:', bet);
+    console.log('Current multiplier:', multiplier);
     
     // Clear intervals
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
 
+    // Demo mode - don't call API but still show celebration/loss screen
+    if (bet === '0') {
+      setGameResult({
+        completed,
+        score,
+        multiplier,
+        winnings: 0, // No winnings in demo mode
+        wallet: wallet || { balance: 0 },
+        timeSurvived: targetTime - timeLeft,
+        targetTime,
+        isDemo: true
+      });
+      
+      // Set appropriate game state for UI effects
+      setGameState(completed ? 'celebrating' : 'lost');
+      
+      // Start celebration or loss animation
+      if (completed) {
+        // Start confetti animation
+        Animated.sequence([
+          Animated.timing(celebrationAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(confettiAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          })
+        ]).start();
+      } else {
+        // Start loss animation
+        Animated.sequence([
+          Animated.timing(celebrationAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          })
+        ]).start();
+      }
+      return;
+    }
+
     try {
-      // Send results to server
+      // Send results to server for real betting
       const result = await apiService.flappyBird({
         bet: parseFloat(bet),
         completed,
@@ -233,29 +371,88 @@ export default function FlappyBirdScreen({ navigation }) {
       });
       
       if (result.success) {
-        setWallet(result.wallet);
+        // Update wallet state immediately
+        const newWallet = result.wallet;
+        setWallet(newWallet);
+        console.log('Wallet updated:', newWallet);
         
-        const message = completed 
-          ? `🎉 Congratulations! You survived ${targetTime} seconds!\n\nScore: ${score}\nMultiplier: ${multiplier}x\nWinnings: $${result.winnings?.toFixed(2) || 0}\nNew Balance: $${result.wallet.balance?.toFixed(2) || result.wallet}`
-          : `💥 Game Over! You survived ${targetTime - timeLeft} seconds.\n\nScore: ${score}\nBet Lost: $${bet}\nNew Balance: $${result.wallet.balance?.toFixed(2) || result.wallet}`;
+        setGameResult({
+          completed,
+          score,
+          multiplier,
+          winnings: result.winnings || 0,
+          wallet: newWallet,
+          timeSurvived: targetTime - timeLeft,
+          targetTime
+        });
         
-        Alert.alert(completed ? 'Victory!' : 'Game Over', message);
+        // Set appropriate game state for UI effects
+        setGameState(completed ? 'celebrating' : 'lost');
+        
+        // Start celebration or loss animation
+        if (completed) {
+          // Start confetti animation
+          Animated.sequence([
+            Animated.timing(celebrationAnim, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(confettiAnim, {
+              toValue: 1,
+              duration: 2000,
+              useNativeDriver: true,
+            })
+          ]).start();
+        } else {
+          // Start loss animation (shake or fade)
+          Animated.sequence([
+            Animated.timing(celebrationAnim, {
+              toValue: 1,
+              duration: 800,
+              useNativeDriver: true,
+            })
+          ]).start();
+        }
       }
     } catch (error) {
       console.error('Error ending game:', error);
-      Alert.alert('Error', 'Failed to process game result. Please try again.');
+      if (Platform.OS === 'web') {
+        console.log('Error', 'Failed to process game result. Please try again.');
+      } else {
+        Alert.alert('Error', 'Failed to process game result. Please try again.');
+      }
     }
   };
 
-  const resetGame = () => {
+  const resetGame = async () => {
     setGameState('menu');
+    setCountdown(3);
     setScore(0);
     setTimeLeft(targetTime);
     setMultiplier(1);
     setTotalWinnings(0);
-    setBird({ x: 50, y: height / 2, velocity: 0 });
+    setGameResult(null);
+    
+    // Reset animations
+    celebrationAnim.setValue(0);
+    confettiAnim.setValue(0);
+    
+    setBird({ x: 50, y: gameHeight / 2, velocity: 0 });
     setPipes([]);
     setBackground({ x: 0 });
+    
+    // Refresh wallet balance
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const response = await apiService.getWallet();
+        setWallet(response.data || response);
+        console.log('Wallet refreshed after game reset:', response.data || response);
+      }
+    } catch (error) {
+      console.log('Error refreshing wallet:', error);
+    }
   };
 
   // Game rendering components
@@ -303,18 +500,91 @@ export default function FlappyBirdScreen({ navigation }) {
   );
 
   const renderBackground = () => (
-    <View style={[styles.background, { left: background.x % width }]}>
+    <View style={[
+      styles.background, 
+      { 
+        left: background.x % gameWidth,
+        width: gameWidth * 2
+      }
+    ]}>
       <Text style={styles.backgroundText}>☁️ ☁️ ☁️ ☁️ ☁️</Text>
     </View>
   );
 
+  // Error Screen
+  if (error) {
+    return (
+      <View style={styles.menuContainer}>
+        <View style={styles.menuCard}>
+          <Text style={styles.title}>🐦 Flappy Bird</Text>
+          <Text style={[styles.subtitle, { color: 'red', marginBottom: 20 }]}>
+            {error}
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.startButton} 
+            onPress={() => {
+              setError(null);
+              // Try to reload wallet
+              if (auth.currentUser) {
+                apiService.getWallet()
+                  .then((response) => setWallet(response.data || response))
+                  .catch(() => setWallet({ balance: 0 }));
+              }
+            }}
+          >
+            <Text style={styles.startButtonText}>Try Again</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.startButton, { backgroundColor: '#4CAF50', marginTop: 10 }]} 
+            onPress={() => {
+              setError(null);
+              setWallet({ balance: 0 });
+              setBet('0'); // Set demo mode bet
+            }}
+          >
+            <Text style={styles.startButtonText}>Play Demo Mode (No Betting)</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.startButton, { backgroundColor: '#666', marginTop: 10 }]} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.startButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Loading Screen
+  if (wallet === null) {
+    return (
+      <View style={styles.menuContainer}>
+        <View style={styles.menuCard}>
+          <Text style={styles.title}>🐦 Flappy Bird</Text>
+          <Text style={styles.subtitle}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
   // Menu Screen
   if (gameState === 'menu') {
+    console.log('Rendering menu screen'); // Debug log
     return (
-      <View style={styles.container}>
+      <View style={styles.menuContainer}>
         <View style={styles.menuCard}>
           <Text style={styles.title}>🐦 Flappy Bird</Text>
           <Text style={styles.subtitle}>Survive the target time to win!</Text>
+          
+          {/* Demo Mode Indicator */}
+          {bet === '0' && (
+            <Text style={[styles.subtitle, { color: '#4CAF50', fontWeight: 'bold', marginBottom: 10 }]}>
+              🎮 DEMO MODE - No Betting
+            </Text>
+          )}
           
           {/* Wallet Balance */}
           {wallet !== null && (
@@ -387,8 +657,235 @@ export default function FlappyBirdScreen({ navigation }) {
     );
   }
 
+  // Celebration Screen (Win)
+  if (gameState === 'celebrating' && gameResult) {
+    return (
+      <View style={styles.celebrationContainer}>
+        <Animated.View style={[
+          styles.celebrationCard,
+          {
+            transform: [{
+              scale: celebrationAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.5, 1],
+              })
+            }],
+            opacity: celebrationAnim
+          }
+        ]}>
+          <Text style={styles.celebrationTitle}>🎉 CONGRATULATIONS! 🎉</Text>
+          <Text style={styles.celebrationSubtitle}>You Won!</Text>
+          
+          {/* Confetti Effect */}
+          <Animated.View style={[
+            styles.confettiContainer,
+            {
+              transform: [{
+                translateY: confettiAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-50, 0],
+                })
+              }],
+              opacity: confettiAnim
+            }
+          ]}>
+            <Text style={styles.confetti}>🎊 🎉 🎊 🎉 🎊</Text>
+            <Text style={styles.confetti}>🌟 ⭐ 🌟 ⭐ 🌟</Text>
+            <Text style={styles.confetti}>🎊 🎉 🎊 🎉 🎊</Text>
+          </Animated.View>
+          
+          <View style={styles.resultStats}>
+            <Text style={styles.statText}>Score: {gameResult.score}</Text>
+            <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
+            <Text style={styles.statText}>Multiplier: {gameResult.multiplier}x</Text>
+            {gameResult.isDemo ? (
+              <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
+            ) : (
+              <>
+                <Text style={styles.winningsText}>Winnings: ${gameResult.winnings.toFixed(2)}</Text>
+                <Text style={styles.balanceText}>New Balance: ${(typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet).toFixed(2)}</Text>
+              </>
+            )}
+          </View>
+          
+          <TouchableOpacity style={styles.playAgainButton} onPress={resetGame}>
+            <Text style={styles.playAgainButtonText}>Play Again</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.menuButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.menuButtonText}>Back to Menu</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  // Loss Screen
+  if (gameState === 'lost' && gameResult) {
+    return (
+      <View style={styles.lossContainer}>
+        <Animated.View style={[
+          styles.lossCard,
+          {
+            transform: [{
+              scale: celebrationAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1],
+              })
+            }],
+            opacity: celebrationAnim
+          }
+        ]}>
+          <Text style={styles.lossTitle}>💥 Game Over</Text>
+          <Text style={styles.lossSubtitle}>Better luck next time!</Text>
+          
+          {/* Loss Effect */}
+          <View style={styles.lossEffectContainer}>
+            <Text style={styles.lossEffect}>💔 😔 💔</Text>
+            <Text style={styles.lossEffect}>⚡ 💥 ⚡</Text>
+          </View>
+          
+          <View style={styles.resultStats}>
+            <Text style={styles.statText}>Score: {gameResult.score}</Text>
+            <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
+            <Text style={styles.statText}>Multiplier: {gameResult.multiplier}x</Text>
+            {gameResult.isDemo ? (
+              <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
+            ) : (
+              <>
+                <Text style={styles.lossText}>Bet Lost: ${parseFloat(bet).toFixed(2)}</Text>
+                <Text style={styles.balanceText}>New Balance: ${(typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet).toFixed(2)}</Text>
+              </>
+            )}
+          </View>
+          
+          <TouchableOpacity style={styles.playAgainButton} onPress={resetGame}>
+            <Text style={styles.playAgainButtonText}>Try Again</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.menuButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.menuButtonText}>Back to Menu</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  // Countdown Screen
+  if (gameState === 'countdown') {
+    return Platform.OS === 'web' ? (
+      // Web version - boxed countdown
+      <View style={styles.webGameWrapper}>
+        <View style={styles.webGameContainer}>
+          <View style={styles.gameContainer}>
+            {/* Background */}
+            {renderBackground()}
+            
+            {/* Ground and Ceiling indicators */}
+            <View style={styles.ground} />
+            <View style={styles.ceiling} />
+            
+            {/* Game Objects (static) */}
+            {renderBird()}
+            
+            {/* Countdown Display */}
+            <View style={styles.countdownContainer}>
+              <Animated.Text style={[
+                styles.countdownText,
+                {
+                  transform: [{ scale: pulseAnim }]
+                }
+              ]}>
+                {countdown > 0 ? countdown : 'GO!'}
+              </Animated.Text>
+              <Text style={styles.countdownSubtext}>
+                Get Ready!
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    ) : (
+      // Mobile version - full screen countdown
+      <View style={styles.gameContainer}>
+        {/* Background */}
+        {renderBackground()}
+        
+        {/* Ground and Ceiling indicators */}
+        <View style={styles.ground} />
+        <View style={styles.ceiling} />
+        
+        {/* Game Objects (static) */}
+        {renderBird()}
+        
+        {/* Countdown Display */}
+        <View style={styles.countdownContainer}>
+          <Animated.Text style={[
+            styles.countdownText,
+            {
+              transform: [{ scale: pulseAnim }]
+            }
+          ]}>
+            {countdown > 0 ? countdown : 'GO!'}
+          </Animated.Text>
+          <Text style={styles.countdownSubtext}>
+            Get Ready!
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   // Game Screen
-  return (
+  console.log('Game state:', gameState, 'Platform:', Platform.OS); // Debug log
+  return Platform.OS === 'web' ? (
+    // Web version - boxed game container
+    <View style={styles.webGameWrapper}>
+      <TouchableOpacity 
+        style={styles.webGameContainer}
+        activeOpacity={1} 
+        onPress={jump}
+      >
+        <View style={styles.gameContainer}>
+          {/* Background */}
+          {renderBackground()}
+          
+          {/* Ground and Ceiling indicators */}
+          <View style={styles.ground} />
+          <View style={styles.ceiling} />
+          
+          {/* Game Objects */}
+          {renderBird()}
+          {renderPipes()}
+          
+          {/* HUD */}
+          <View style={styles.hud}>
+            <Text style={styles.hudText}>Score: {score}</Text>
+            <Text style={styles.hudText}>Time: {timeLeft}s</Text>
+            <Text style={styles.hudText}>Multiplier: {multiplier}x</Text>
+            {totalWinnings > 0 && (
+              <Text style={styles.winningsText}>Winnings: ${totalWinnings.toFixed(2)}</Text>
+            )}
+          </View>
+          
+          {/* Instructions */}
+          <View style={styles.instructionsContainer}>
+            <Text style={styles.instructionsText}>
+              {Platform.OS === 'web' ? 'Tap or Press SPACEBAR to jump!' : 'Tap to jump!'}
+            </Text>
+          </View>
+
+        </View>
+      </TouchableOpacity>
+    </View>
+  ) : (
+    // Mobile version - full screen
     <TouchableOpacity 
       style={styles.gameContainer} 
       activeOpacity={1} 
@@ -396,6 +893,10 @@ export default function FlappyBirdScreen({ navigation }) {
     >
       {/* Background */}
       {renderBackground()}
+      
+      {/* Ground and Ceiling indicators */}
+      <View style={styles.ground} />
+      <View style={styles.ceiling} />
       
       {/* Game Objects */}
       {renderBird()}
@@ -413,33 +914,11 @@ export default function FlappyBirdScreen({ navigation }) {
       
       {/* Instructions */}
       <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionsText}>Tap to jump!</Text>
+        <Text style={styles.instructionsText}>
+          {Platform.OS === 'web' ? 'Tap or Press SPACEBAR to jump!' : 'Tap to jump!'}
+        </Text>
       </View>
 
-      {/* Game Over Modal */}
-      {gameState === 'gameOver' && (
-        <View style={styles.gameOverModal}>
-          <View style={styles.gameOverCard}>
-            <Text style={styles.gameOverTitle}>Game Over!</Text>
-            <Text style={styles.gameOverStats}>
-              Score: {score}{'\n'}
-              Time Survived: {targetTime - timeLeft}s / {targetTime}s{'\n'}
-              Final Multiplier: {multiplier}x
-            </Text>
-            
-            <TouchableOpacity style={styles.playAgainButton} onPress={resetGame}>
-              <Text style={styles.playAgainButtonText}>Play Again</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.menuButton} 
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.menuButtonText}>Back to Menu</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </TouchableOpacity>
   );
 };
@@ -449,6 +928,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f0f23',
     justifyContent: 'center',
+    padding: 20,
+  },
+  menuContainer: {
+    flex: 1,
+    backgroundColor: '#2c3e50',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
   card: {
@@ -514,10 +1000,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#87CEEB',
     position: 'relative',
   },
+  ground: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    backgroundColor: '#8B4513',
+    borderTopWidth: 3,
+    borderTopColor: '#654321',
+    zIndex: 10,
+  },
+  ceiling: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 30,
+    backgroundColor: '#696969',
+    borderBottomWidth: 2,
+    borderBottomColor: '#2F4F4F',
+    zIndex: 10,
+  },
+  webGameWrapper: {
+    flex: 1,
+    backgroundColor: '#2c3e50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  webGameContainer: {
+    width: 800,
+    height: 600,
+    borderRadius: 15,
+    overflow: 'hidden',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+    border: '3px solid #34495e',
+  },
   background: {
     position: 'absolute',
     top: 50,
-    width: width * 2,
     alignItems: 'center',
   },
   backgroundText: {
@@ -545,7 +1067,7 @@ const styles = StyleSheet.create({
   },
   hud: {
     position: 'absolute',
-    top: 50,
+    top: 35, // Moved down to avoid ceiling
     left: 20,
     right: 20,
     flexDirection: 'row',
@@ -575,6 +1097,34 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     zIndex: 200,
+  },
+  countdownContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 500,
+  },
+  countdownText: {
+    fontSize: 80,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 3, height: 3 },
+    textShadowRadius: 5,
+    marginBottom: 10,
+  },
+  countdownSubtext: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 3,
   },
   instructionsText: {
     fontSize: 18,
@@ -740,5 +1290,122 @@ const styles = StyleSheet.create({
   },
   timeButtonTextSelected: {
     color: 'white',
+  },
+  
+  // Celebration Screen Styles
+  celebrationContainer: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  celebrationCard: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 350,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  celebrationTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  celebrationSubtitle: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  confettiContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  confetti: {
+    fontSize: 24,
+    textAlign: 'center',
+    marginVertical: 2,
+  },
+  
+  // Loss Screen Styles
+  lossContainer: {
+    flex: 1,
+    backgroundColor: '#f44336',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  lossCard: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 350,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  lossTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#f44336',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  lossSubtitle: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  lossEffectContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  lossEffect: {
+    fontSize: 24,
+    textAlign: 'center',
+    marginVertical: 2,
+  },
+  
+  // Shared result styles
+  resultStats: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  statText: {
+    fontSize: 16,
+    color: '#333',
+    marginVertical: 2,
+  },
+  winningsText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginVertical: 2,
+  },
+  lossText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#f44336',
+    marginVertical: 2,
+  },
+  demoText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginVertical: 2,
   },
 });

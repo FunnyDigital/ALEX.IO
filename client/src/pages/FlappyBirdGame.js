@@ -22,11 +22,11 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
     // Game state
     const bird = useRef({ x: 60, y: 200, vy: 0, width: 32, height: 32 });
     const pipes = useRef([]);
-    const gravity = 0.5;
-    const lift = -7.5; // Reduced from -8.5 for better control
-    const pipeGap = 140;
+    const gravity = 0.6; // Back to original
+    const lift = -7; // Reduced jump force for smoother control
+    const pipeGap = 180; // Keep the increased gap
     const pipeWidth = 52;
-    const pipeSpeed = 2.8;
+    const pipeSpeed = 2.8; // Keep normal speed
 
     // Resize canvas to fit viewport (no scroll)
     useEffect(() => {
@@ -283,8 +283,11 @@ function FlappyBirdGame() {
     };
 
     const handleGameOver = async (completed, timeSurvived, score, multiplier = 1) => {
+        console.log('=== WEB GAME ENDING ===');
+        console.log('Completed:', completed);
+        console.log('Multiplier:', multiplier);
+        
         setResult({ win: completed, time: timeSurvived, score, multiplier });
-        setGameState('gameOver');
         
         // Calculate total winnings based on time milestones
         const totalWinnings = completed ? Number(wager) * multiplier : 0;
@@ -311,11 +314,17 @@ function FlappyBirdGame() {
             
             if (res.data?.success) {
                 setWallet(res.data.wallet);
+                console.log('Web game settlement successful:', res.data);
+                
+                // Set celebration or loss state instead of gameOver
+                setGameState(completed ? 'celebrating' : 'lost');
             } else {
                 throw new Error(res.data?.message || 'Settlement failed');
             }
         } catch (e) {
             setError(e.message || 'Settlement error');
+            // Still show result screen even if API fails
+            setGameState(completed ? 'celebrating' : 'lost');
         }
     };
 
@@ -437,41 +446,113 @@ function FlappyBirdGame() {
                         <FlappyBirdCanvas onGameOver={handleGameOver} targetTime={targetTime} setElapsedExternal={setElapsed} />
                     )}
                     
-                    {gameState === 'gameOver' && result && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
+                    {/* Celebration Screen */}
+                    {gameState === 'celebrating' && result && (
+                        <div style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center', 
+                            gap: 20, 
+                            width: '100%',
+                            padding: 20,
+                            backgroundColor: '#4CAF50',
+                            borderRadius: 15,
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: 32, marginBottom: 10 }}>
+                                🎉 CONGRATULATIONS! 🎉
+                            </div>
                             <h2 style={{
                                 fontSize: 24,
                                 fontWeight: 700,
-                                color: result.win ? 'var(--green-accent)' : 'var(--red-accent)',
-                                margin: 0,
-                                textAlign: 'center'
+                                color: 'white',
+                                margin: 0
                             }}>
-                                {result.win ? 'YOU WON!' : 'GAME OVER'}
+                                You Won!
                             </h2>
                             
-                            <div style={{ color: 'var(--text-primary)', fontSize: 16, textAlign: 'center', lineHeight: 1.6 }}>
-                                <div>Time Survived: <strong style={{ color: 'var(--text-gold)' }}>{result.time ?? elapsed}s</strong></div>
-                                <div>Wager: <strong style={{ color: 'var(--text-gold)' }}>${wager}</strong></div>
-                                {wallet !== null && <div>Wallet: <strong style={{ color: 'var(--text-gold)' }}>${wallet}</strong></div>}
+                            {/* Confetti Effect */}
+                            <div style={{ fontSize: 24, lineHeight: 1.2, color: 'white' }}>
+                                🎊 🎉 🎊 🎉 🎊<br/>
+                                🌟 ⭐ 🌟 ⭐ 🌟<br/>
+                                🎊 🎉 🎊 🎉 🎊
                             </div>
                             
-                            <button
-                                onClick={handleAgain}
-                                className="gaming-button-primary"
-                                style={{
-                                    width: '100%',
-                                    padding: '14px 0',
-                                    borderRadius: 8,
-                                    background: 'var(--gradient-gold)',
-                                    color: 'var(--primary-bg)',
-                                    border: 'none',
-                                    fontWeight: 700,
-                                    fontSize: 18,
-                                    cursor: 'pointer',
-                                    boxShadow: 'var(--shadow-primary)'
-                                }}
-                            >
+                            <div style={{ color: 'white', fontSize: 16, lineHeight: 1.6 }}>
+                                <div><strong>Score:</strong> {result.score}</div>
+                                <div><strong>Time:</strong> {result.time}s / {targetTime}s</div>
+                                <div><strong>Multiplier:</strong> {result.multiplier}x</div>
+                                <div><strong style={{ color: '#FFD700' }}>Winnings: ${(Number(wager) * result.multiplier).toFixed(2)}</strong></div>
+                                {wallet !== null && <div><strong style={{ color: '#FFD700' }}>New Balance: ${wallet}</strong></div>}
+                            </div>
+                            
+                            <button onClick={handleAgain} style={{
+                                backgroundColor: 'white',
+                                color: '#4CAF50',
+                                border: 'none',
+                                padding: '12px 24px',
+                                borderRadius: 8,
+                                fontSize: 16,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                marginTop: 10
+                            }}>
                                 Play Again
+                            </button>
+                        </div>
+                    )}
+                    
+                    {/* Loss Screen */}
+                    {gameState === 'lost' && result && (
+                        <div style={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center', 
+                            gap: 20, 
+                            width: '100%',
+                            padding: 20,
+                            backgroundColor: '#f44336',
+                            borderRadius: 15,
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: 32, marginBottom: 10 }}>
+                                💥 Game Over
+                            </div>
+                            <h2 style={{
+                                fontSize: 24,
+                                fontWeight: 700,
+                                color: 'white',
+                                margin: 0
+                            }}>
+                                Better luck next time!
+                            </h2>
+                            
+                            {/* Loss Effect */}
+                            <div style={{ fontSize: 24, lineHeight: 1.2, color: 'white' }}>
+                                💔 😔 💔<br/>
+                                ⚡ 💥 ⚡
+                            </div>
+                            
+                            <div style={{ color: 'white', fontSize: 16, lineHeight: 1.6 }}>
+                                <div><strong>Score:</strong> {result.score}</div>
+                                <div><strong>Time:</strong> {result.time}s / {targetTime}s</div>
+                                <div><strong>Multiplier:</strong> {result.multiplier}x</div>
+                                <div><strong style={{ color: '#FFB6C1' }}>Bet Lost: ${Number(wager).toFixed(2)}</strong></div>
+                                {wallet !== null && <div><strong style={{ color: '#FFD700' }}>New Balance: ${wallet}</strong></div>}
+                            </div>
+                            
+                            <button onClick={handleAgain} style={{
+                                backgroundColor: 'white',
+                                color: '#f44336',
+                                border: 'none',
+                                padding: '12px 24px',
+                                borderRadius: 8,
+                                fontSize: 16,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                marginTop: 10
+                            }}>
+                                Try Again
                             </button>
                         </div>
                     )}
