@@ -68,11 +68,13 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
         if (!running) return;
         const ctx = canvasRef.current.getContext('2d');
         let frame = 0;
+        let gameStartTime = Date.now();
         const { w: canvasW, h: canvasH } = canvasSize;
 
         function reset() {
             bird.current = { x: 60, y: canvasH / 2, vy: 0, width: 32, height: 32 };
             pipes.current = [];
+            gameStartTime = Date.now();
             setElapsed(0);
             if (setElapsedExternal) setElapsedExternal(0);
             frame = 0;
@@ -149,6 +151,9 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
         }
 
         function step() {
+            // Calculate real elapsed time
+            const currentElapsed = Math.floor((Date.now() - gameStartTime) / 1000);
+            
             frame++;
             // Bird physics
             bird.current.vy += gravity;
@@ -170,15 +175,15 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
             if (collision()) {
                 setRunning(false);
                 setGameOver(true);
-                onGameOver(false, elapsed, score, multiplier);
+                onGameOver(false, currentElapsed, score, multiplier);
                 return;
             }
             // Win
-            if (elapsed >= targetTime) {
-                console.log(`Game should end! elapsed: ${elapsed}, target: ${targetTime}`);
+            if (currentElapsed >= targetTime) {
+                console.log(`Game should end! elapsed: ${currentElapsed}, target: ${targetTime}`);
                 setRunning(false);
                 setGameOver(true);
-                onGameOver(true, elapsed, score, multiplier);
+                onGameOver(true, currentElapsed, score, multiplier);
                 return;
             }
             requestRef.current = requestAnimationFrame(step);
@@ -187,16 +192,13 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
         reset();
         requestRef.current = requestAnimationFrame(step);
         timerRef.current = setInterval(() => {
-            setElapsed(e => {
-                const newElapsed = e + 1;
-                console.log(`Timer tick: ${newElapsed}s, target: ${targetTime}s`);
-                if (setElapsedExternal) setElapsedExternal(newElapsed);
-                
-                // Calculate multiplier based on time milestones (every 1 second)
-                setMultiplier(prev => prev + 0.5);
-                
-                return newElapsed;
-            });
+            const currentElapsed = Math.floor((Date.now() - gameStartTime) / 1000);
+            console.log(`Timer tick: ${currentElapsed}s, target: ${targetTime}s`);
+            setElapsed(currentElapsed);
+            if (setElapsedExternal) setElapsedExternal(currentElapsed);
+            
+            // Calculate multiplier based on time milestones (every 1 second)
+            setMultiplier(1 + currentElapsed * 0.5);
         }, 1000);
         return () => {
             cancelAnimationFrame(requestRef.current);

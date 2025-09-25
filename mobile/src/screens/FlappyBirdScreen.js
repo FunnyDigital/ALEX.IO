@@ -15,12 +15,12 @@ import { apiService } from '../config/api';
 import { auth } from '../config/firebase';
 
 const { width, height } = Dimensions.get('window');
-// Use smaller dimensions for web to fit in the boxed container
-const gameWidth = Platform.OS === 'web' ? 800 : width;
-const gameHeight = Platform.OS === 'web' ? 600 : height;
+// Use reasonable dimensions that aren't full screen for mobile
+const gameWidth = Platform.OS === 'web' ? 800 : Math.min(width, 400);
+const gameHeight = Platform.OS === 'web' ? 600 : Math.min(height * 0.7, 600);
 const BIRD_SIZE = 30;
 const PIPE_WIDTH = 50;
-const PIPE_GAP = 150; // Increased from 150 to make it easier
+const PIPE_GAP = 150; // Increased from 150 to make it much easier
 const GRAVITY = 0.3; // Increased from 0.4 to make it easier
 const JUMP_FORCE = -4; // Increased from -8 for stronger jumps
 
@@ -885,12 +885,13 @@ export default function FlappyBirdScreen({ navigation }) {
       </TouchableOpacity>
     </View>
   ) : (
-    // Mobile version - full screen
-    <TouchableOpacity 
-      style={styles.gameContainer} 
-      activeOpacity={1} 
-      onPress={jump}
-    >
+    // Mobile version - centered game area
+    <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.gameContainer} 
+        activeOpacity={1} 
+        onPress={jump}
+      >
       {/* Background */}
       {renderBackground()}
       
@@ -920,6 +921,7 @@ export default function FlappyBirdScreen({ navigation }) {
       </View>
 
     </TouchableOpacity>
+    </View>
   );
 };
 
@@ -996,9 +998,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   gameContainer: {
-    flex: 1,
+    width: gameWidth,
+    height: gameHeight,
     backgroundColor: '#87CEEB',
     position: 'relative',
+    alignSelf: 'center',
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   ground: {
     position: 'absolute',
@@ -1060,10 +1066,15 @@ const styles = StyleSheet.create({
   pipe: {
     position: 'absolute',
     width: PIPE_WIDTH,
-    backgroundColor: '#228B22',
+    backgroundColor: '#22c55e', // Brighter green for better visibility
     borderRadius: 5,
-    borderWidth: 2,
-    borderColor: '#006400',
+    borderWidth: 3, // Thicker border for better visibility
+    borderColor: '#16a34a', // Darker green border for contrast
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5, // Android shadow
   },
   hud: {
     position: 'absolute',
