@@ -454,16 +454,19 @@ function FlappyBirdGame() {
                             display: 'flex', 
                             flexDirection: 'column', 
                             alignItems: 'center', 
-                            gap: 20, 
-                            width: '100%',
-                            padding: 35,
+                            gap: 15, 
+                            width: '90%',
+                            maxWidth: '350px',
+                            padding: '25px 20px',
                             background: 'linear-gradient(135deg, #6A1B9A 0%, #8E24AA 50%, #9C27B0 100%)',
                             borderRadius: 25,
                             textAlign: 'center',
                             boxShadow: '0 8px 32px rgba(106, 27, 154, 0.4)',
                             border: '3px solid rgba(255, 215, 0, 0.3)',
                             position: 'relative',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            minHeight: '400px',
+                            justifyContent: 'space-around'
                         }}>
                             {/* Golden Trophy */}
                             <div style={{
@@ -480,21 +483,11 @@ function FlappyBirdGame() {
                                     position: 'relative'
                                 }}>
                                     🏆
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '-5px',
-                                        right: '-10px',
-                                        backgroundColor: '#FFD700',
-                                        borderRadius: '50%',
-                                        padding: '3px',
-                                        border: '2px solid #FFA000',
-                                        fontSize: '16px'
-                                    }}>⭐</div>
                                 </div>
                             </div>
                             
                             <div style={{ 
-                                fontSize: 28, 
+                                fontSize: 24, 
                                 fontWeight: 'bold',
                                 color: 'white',
                                 textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
@@ -504,27 +497,14 @@ function FlappyBirdGame() {
                                 CONGRATULATIONS!
                             </div>
                             <h2 style={{
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: 600,
                                 color: 'rgba(255, 255, 255, 0.9)',
                                 margin: 0,
-                                marginBottom: 20
+                                marginBottom: 15
                             }}>
                                 You're a Winner!
                             </h2>
-                            
-                            {/* Enhanced Confetti Effect */}
-                            <div style={{ 
-                                fontSize: 20, 
-                                lineHeight: 1.4, 
-                                color: 'white',
-                                textShadow: '1px 1px 2px rgba(255, 215, 0, 0.3)',
-                                marginBottom: 15
-                            }}>
-                                ✨ 🎊 ✨ 🎉 ✨  ✨<br/>
-                                🌟 💫 🌟 💫 🌟 💫 🌟<br/>
-                                🎊 ✨ 🎉 ✨ 🎊 ✨ �
-                            </div>
                             
                             <div style={{ 
                                 color: 'white', 

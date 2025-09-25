@@ -39,6 +39,7 @@ export default function FlappyBirdScreen({ navigation }) {
   const [multiplier, setMultiplier] = useState(1);
   const [totalWinnings, setTotalWinnings] = useState(0);
   const [gameResult, setGameResult] = useState(null); // Store game result for celebration/loss screen
+  const [resultLoading, setResultLoading] = useState(false); // Track if API is updating wallet
   
   // Game Objects
   const [bird, setBird] = useState({ x: 50, y: gameHeight / 2, velocity: 0 });
@@ -330,6 +331,7 @@ export default function FlappyBirdScreen({ navigation }) {
       targetTime,
       isDemo: bet === '0'
     });
+    setResultLoading(bet !== '0');
     setGameState(completed ? 'celebrating' : 'lost');
     if (completed) {
       Animated.sequence([
@@ -353,7 +355,10 @@ export default function FlappyBirdScreen({ navigation }) {
     }
 
     // If demo mode, skip API call
-    if (bet === '0') return;
+    if (bet === '0') {
+      setResultLoading(false);
+      return;
+    }
 
     // Run API call in background, update wallet and winnings if needed
     try {
@@ -376,8 +381,10 @@ export default function FlappyBirdScreen({ navigation }) {
           winnings: completed ? (result.winnings !== undefined ? result.winnings : totalWinnings) : 0,
           wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
         }));
+        setResultLoading(false);
       }
     } catch (error) {
+      setResultLoading(false);
       console.error('Error ending game:', error);
     }
   };
@@ -674,7 +681,7 @@ export default function FlappyBirdScreen({ navigation }) {
             opacity: celebrationAnim
           }
         ]}>
-          {/* Golden Trophy/Medal */}
+          {/* Trophy Icon */}
           <Animated.View style={[
             styles.trophyContainer,
             {
@@ -683,11 +690,6 @@ export default function FlappyBirdScreen({ navigation }) {
                   inputRange: [0, 1],
                   outputRange: [0.3, 1],
                 })
-              }, {
-                rotateZ: celebrationAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0deg', '5deg'],
-                })
               }],
               opacity: celebrationAnim
             }
@@ -695,44 +697,24 @@ export default function FlappyBirdScreen({ navigation }) {
             <View style={styles.trophyWrapper}>
               <View style={styles.trophy}>
                 <Text style={styles.trophyIcon}>🏆</Text>
-                <View style={styles.trophyStar}>
-                  <Text style={styles.starIcon}>⭐</Text>
-                </View>
               </View>
             </View>
           </Animated.View>
 
           <Text style={styles.celebrationTitle}>CONGRATULATIONS!</Text>
           <Text style={styles.celebrationSubtitle}>You're a Winner!</Text>
-          
-          {/* Enhanced Confetti Effect */}
-          <Animated.View style={[
-            styles.confettiContainer,
-            {
-              transform: [{
-                translateY: confettiAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-30, 10],
-                })
-              }],
-              opacity: confettiAnim
-            }
-          ]}>
-            <Text style={styles.confetti}>✨ 🎊 ✨ 🎉 ✨ 🎊 ✨</Text>
-            <Text style={styles.confetti}>🌟 💫 🌟 💫 🌟 💫 🌟</Text>
-            <Text style={styles.confetti}>🎊 ✨ 🎉 ✨ 🎊 ✨ 🎉</Text>
-          </Animated.View>
-          
           <View style={styles.resultStats}>
             <Text style={styles.statText}>Score: {gameResult.score}</Text>
             <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
             <Text style={styles.statText}>Multiplier: {gameResult.multiplier}x</Text>
             {gameResult.isDemo ? (
               <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
+            ) : resultLoading ? (
+              <Text style={styles.balanceText}>Updating balance...</Text>
             ) : (
               <>
                 <Text style={styles.winningsText}>Winnings: ${gameResult.winnings.toFixed(2)}</Text>
-                <Text style={styles.balanceText}>New Balance: ${(typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet).toFixed(2)}</Text>
+                <Text style={styles.balanceText}>New Balance: {(wallet && typeof wallet.balance === 'number' ? wallet.balance : (typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet)).toFixed(2)}</Text>
               </>
             )}
           </View>
@@ -1290,11 +1272,12 @@ const styles = StyleSheet.create({
   },
   playAgainButton: {
     backgroundColor: '#8E24AA',
-    paddingVertical: 15,
-    paddingHorizontal: 35,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     borderRadius: 25,
-    marginBottom: 15,
-    minWidth: 200,
+    marginBottom: 12,
+    width: '80%',
+    maxWidth: 200,
     shadowColor: '#6A1B9A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1302,10 +1285,11 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 2,
     borderColor: '#9C27B0',
+    alignItems: 'center',
   },
   playAgainButtonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -1314,12 +1298,14 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     backgroundColor: 'rgba(158, 158, 158, 0.2)',
-    paddingVertical: 12,
-    paddingHorizontal: 35,
+    paddingVertical: 10,
+    paddingHorizontal: 25,
     borderRadius: 25,
-    minWidth: 200,
+    width: '80%',
+    maxWidth: 200,
     borderWidth: 2,
     borderColor: 'rgba(117, 117, 117, 0.4)',
+    alignItems: 'center',
   },
   menuButtonText: {
     color: '#757575',
@@ -1436,10 +1422,12 @@ const styles = StyleSheet.create({
   celebrationCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 25,
-    padding: 35,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    width: '100%',
-    maxWidth: 370,
+    width: '90%',
+    maxWidth: 350,
+    minHeight: 400,
     shadowColor: '#4A148C',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
@@ -1447,10 +1435,11 @@ const styles = StyleSheet.create({
     elevation: 20,
     borderWidth: 3,
     borderColor: 'rgba(255, 215, 0, 0.3)',
+    justifyContent: 'space-around',
   },
   trophyContainer: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 20,
   },
   trophyWrapper: {
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
@@ -1471,22 +1460,8 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 4,
   },
-  trophyStar: {
-    position: 'absolute',
-    top: -5,
-    right: -10,
-    backgroundColor: '#FFD700',
-    borderRadius: 12,
-    padding: 3,
-    borderWidth: 2,
-    borderColor: '#FFA000',
-  },
-  starIcon: {
-    fontSize: 16,
-    color: '#FFA000',
-  },
   celebrationTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#6A1B9A',
     textAlign: 'center',
@@ -1495,13 +1470,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
     letterSpacing: 1,
+    flexShrink: 1,
   },
   celebrationSubtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#8E24AA',
     textAlign: 'center',
-    marginBottom: 25,
+    marginBottom: 20,
     fontWeight: '600',
+    flexShrink: 1,
   },
   confettiContainer: {
     alignItems: 'center',
@@ -1564,12 +1541,16 @@ const styles = StyleSheet.create({
   // Shared result styles
   resultStats: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginVertical: 15,
+    paddingHorizontal: 10,
+    width: '100%',
   },
   statText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
-    marginVertical: 2,
+    marginVertical: 3,
+    textAlign: 'center',
+    flexWrap: 'wrap',
   },
   winningsText: {
     fontSize: 18,
