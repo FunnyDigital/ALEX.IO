@@ -11,8 +11,6 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
     const [running, setRunning] = useState(true);
     const [gameOver, setGameOver] = useState(false);
     const [elapsed, setElapsed] = useState(0);
-    const [score, setScore] = useState(0);
-    const [multiplier, setMultiplier] = useState(1);
     const requestRef = useRef();
     const timerRef = useRef();
 
@@ -175,7 +173,7 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
             if (collision()) {
                 setRunning(false);
                 setGameOver(true);
-                onGameOver(false, currentElapsed, score, multiplier);
+                onGameOver(false, currentElapsed);
                 return;
             }
             // Win
@@ -183,7 +181,7 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
                 console.log(`Game should end! elapsed: ${currentElapsed}, target: ${targetTime}`);
                 setRunning(false);
                 setGameOver(true);
-                onGameOver(true, currentElapsed, score, multiplier);
+                onGameOver(true, currentElapsed);
                 return;
             }
             requestRef.current = requestAnimationFrame(step);
@@ -196,9 +194,6 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
             console.log(`Timer tick: ${currentElapsed}s, target: ${targetTime}s`);
             setElapsed(currentElapsed);
             if (setElapsedExternal) setElapsedExternal(currentElapsed);
-            
-            // Calculate multiplier based on time milestones (every 1 second)
-            setMultiplier(1 + currentElapsed * 0.5);
         }, 1000);
         return () => {
             cancelAnimationFrame(requestRef.current);
@@ -224,8 +219,6 @@ function FlappyBirdCanvas({ onGameOver, targetTime, setElapsedExternal }) {
                     fontSize: '16px',
                     fontWeight: 'bold'
                 }}>
-                    <div>Score: {score}</div>
-                    <div>Multiplier: {multiplier.toFixed(1)}x</div>
                     <div>Time: {Math.floor(elapsed)}s</div>
                 </div>
             )}
@@ -284,48 +277,37 @@ function FlappyBirdGame() {
         setGameState('playing');
     };
 
-    const handleGameOver = async (completed, timeSurvived, score, multiplier = 1) => {
-        console.log('=== WEB GAME ENDING ===');
-        console.log('Completed:', completed);
-        console.log('Multiplier:', multiplier);
-        
-        setResult({ win: completed, time: timeSurvived, score, multiplier });
-        
-        // Calculate total winnings based on time milestones
-        const totalWinnings = completed ? Number(wager) * multiplier : 0;
-        
-        // Settle via backend to ensure atomic update
+    const handleGameOver = async (completed, timeSurvived) => {
+        setResult({ win: completed, time: timeSurvived });
         try {
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated');
             const token = await user.getIdToken();
-            
             const gameData = {
                 bet: Number(wager),
                 completed,
                 timeTarget: Number(targetTime),
-                timeSurvived,
-                score,
-                multiplier,
-                totalWinnings
+                timeSurvived
             };
-            
             const res = await axios.post('/api/games/flappy-bird', gameData, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            
             if (res.data?.success) {
-                setWallet(res.data.wallet);
-                console.log('Web game settlement successful:', res.data);
-                
-                // Set celebration or loss state instead of gameOver
-                setGameState(completed ? 'celebrating' : 'lost');
+                // Use server authoritative wallet then re-load from Firestore for consistency
+                let newWallet = res.data.wallet;
+                try {
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        newWallet = userDoc.data().wallet || newWallet;
+                    }
+                } catch (_) { /* ignore fallback to server value */ }
+                setWallet(newWallet);
             } else {
                 throw new Error(res.data?.message || 'Settlement failed');
             }
+            setGameState(completed ? 'celebrating' : 'lost');
         } catch (e) {
             setError(e.message || 'Settlement error');
-            // Still show result screen even if API fails
             setGameState(completed ? 'celebrating' : 'lost');
         }
     };
@@ -516,10 +498,8 @@ function FlappyBirdGame() {
                                 border: '1px solid rgba(255, 255, 255, 0.2)',
                                 marginBottom: 10
                             }}>
-                                <div><strong>Score:</strong> {result.score}</div>
                                 <div><strong>Time:</strong> {result.time}s / {targetTime}s</div>
-                                <div><strong>Multiplier:</strong> {result.multiplier}x</div>
-                                <div><strong style={{ color: '#FFD700' }}>Winnings: ${(Number(wager) * result.multiplier).toFixed(2)}</strong></div>
+                                <div><strong style={{ color: '#FFD700' }}>Winnings: ${Number(wager).toFixed(2)}</strong></div>
                                 {wallet !== null && <div><strong style={{ color: '#FFD700' }}>New Balance: ${wallet}</strong></div>}
                             </div>
                             
@@ -568,55 +548,111 @@ function FlappyBirdGame() {
                     
                     {/* Loss Screen */}
                     {gameState === 'lost' && result && (
-                        <div style={{ 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            alignItems: 'center', 
-                            gap: 20, 
-                            width: '100%',
-                            padding: 20,
-                            backgroundColor: '#f44336',
-                            borderRadius: 15,
-                            textAlign: 'center'
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 15,
+                            width: '90%',
+                            maxWidth: '350px',
+                            padding: '25px 20px',
+                            background: 'linear-gradient(135deg, #B71C1C 0%, #C62828 50%, #D32F2F 100%)',
+                            borderRadius: 25,
+                            textAlign: 'center',
+                            boxShadow: '0 8px 32px rgba(183, 28, 28, 0.4)',
+                            border: '3px solid rgba(255, 255, 255, 0.15)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            minHeight: '400px',
+                            justifyContent: 'space-around'
                         }}>
-                            <div style={{ fontSize: 32, marginBottom: 10 }}>
-                                💥 Game Over
+                            <div style={{
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                borderRadius: '50%',
+                                padding: '20px',
+                                border: '3px solid rgba(255, 255, 255, 0.25)',
+                                position: 'relative',
+                                marginBottom: 10
+                            }}>
+                                <div style={{
+                                    fontSize: 60,
+                                    filter: 'drop-shadow(2px 2px 4px rgba(255, 64, 64, 0.8))',
+                                    position: 'relative'
+                                }}>
+                                    💥
+                                </div>
+                            </div>
+                            <div style={{
+                                fontSize: 24,
+                                fontWeight: 'bold',
+                                color: 'white',
+                                textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                                letterSpacing: '1px',
+                                marginBottom: 5
+                            }}>
+                                GAME OVER
                             </div>
                             <h2 style={{
-                                fontSize: 24,
-                                fontWeight: 700,
-                                color: 'white',
-                                margin: 0
+                                fontSize: 16,
+                                fontWeight: 600,
+                                color: 'rgba(255, 255, 255, 0.9)',
+                                margin: 0,
+                                marginBottom: 15
                             }}>
                                 Better luck next time!
                             </h2>
-                            
-                            {/* Loss Effect */}
-                            <div style={{ fontSize: 24, lineHeight: 1.2, color: 'white' }}>
-                                💔 😔 💔<br/>
-                                ⚡ 💥 ⚡
-                            </div>
-                            
-                            <div style={{ color: 'white', fontSize: 16, lineHeight: 1.6 }}>
-                                <div><strong>Score:</strong> {result.score}</div>
+                            <div style={{
+                                color: 'white',
+                                fontSize: 16,
+                                lineHeight: 1.6,
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                padding: '15px',
+                                borderRadius: '15px',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                marginBottom: 10
+                            }}>
                                 <div><strong>Time:</strong> {result.time}s / {targetTime}s</div>
-                                <div><strong>Multiplier:</strong> {result.multiplier}x</div>
-                                <div><strong style={{ color: '#FFB6C1' }}>Bet Lost: ${Number(wager).toFixed(2)}</strong></div>
+                                <div><strong style={{ color: '#FFCDD2' }}>Bet Lost: ${Number(wager).toFixed(2)}</strong></div>
                                 {wallet !== null && <div><strong style={{ color: '#FFD700' }}>New Balance: ${wallet}</strong></div>}
                             </div>
-                            
                             <button onClick={handleAgain} style={{
-                                backgroundColor: 'white',
-                                color: '#f44336',
-                                border: 'none',
-                                padding: '12px 24px',
-                                borderRadius: 8,
-                                fontSize: 16,
-                                fontWeight: 600,
+                                background: 'linear-gradient(135deg, #C62828 0%, #D32F2F 100%)',
+                                color: 'white',
+                                border: '2px solid #D32F2F',
+                                padding: '15px 35px',
+                                borderRadius: 25,
+                                fontSize: 18,
+                                fontWeight: 700,
                                 cursor: 'pointer',
-                                marginTop: 10
-                            }}>
+                                marginTop: 10,
+                                minWidth: '200px',
+                                boxShadow: '0 4px 15px rgba(183, 28, 28, 0.3)',
+                                textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                                transition: 'all 0.3s ease'
+                            }}
+                                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                                onMouseOut={(e) => e.target.style.transform = 'translateY(0px)'}
+                            >
                                 Try Again
+                            </button>
+                            <button
+                                onClick={() => window.location.reload()}
+                                style={{
+                                    backgroundColor: 'rgba(158, 158, 158, 0.2)',
+                                    color: '#f5f5f5',
+                                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                                    padding: '12px 35px',
+                                    borderRadius: 25,
+                                    fontSize: 16,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    minWidth: '200px',
+                                    transition: 'all 0.3s ease'
+                                }}
+                                onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(200, 200, 200, 0.25)'}
+                                onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(158, 158, 158, 0.2)'}
+                            >
+                                Back to Main Menu
                             </button>
                         </div>
                     )}

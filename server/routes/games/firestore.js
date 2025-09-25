@@ -193,60 +193,44 @@ router.post('/trade-gamble/settle', authMiddleware, async (req, res) => {
 // POST /api/games/flappy-bird
 router.post('/flappy-bird', authMiddleware, async (req, res) => {
   try {
-    const { bet, completed, timeTarget, timeSurvived, score, multiplier, totalWinnings } = req.body;
-    
-    console.log('Flappy Bird game data:', req.body);
-    
+    const { bet, completed, timeTarget, timeSurvived } = req.body;
+
+    console.log('Flappy Bird (simplified) game data:', req.body);
+
     const amount = Number(bet);
     if (!amount || amount <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid bet amount' });
     }
-    
+
     if (typeof completed !== 'boolean' || !timeTarget || timeSurvived < 0) {
       return res.status(400).json({ success: false, message: 'Invalid game data' });
     }
-    
-    // Calculate winnings based on completion and multiplier
-    let delta;
-    let winnings = 0;
-    
-    if (completed) {
-      // Player completed the target time - they win!
-      winnings = amount * (multiplier || 1); // Bet amount × multiplier
-      delta = -amount + winnings; // Subtract bet, add winnings (net profit)
-    } else {
-      // Player failed - they lose only the bet amount
-      delta = -amount; // Subtract bet amount from wallet
-      winnings = 0;
-    }
-    
+
+    // Simplified settlement: win => +bet, loss => -bet
     const out = await updateWalletTxn(req.user, (current) => {
       if (current < amount) throw new Error('Insufficient funds');
+      const delta = completed ? amount : -amount;
       const newWallet = current + delta;
-      return { 
-        newWallet, 
-        payload: { 
-          win: completed, 
-          winnings,
+      return {
+        newWallet,
+        payload: {
+          win: completed,
+          bet: amount,
           timeSurvived,
-          timeTarget,
-          score,
-          multiplier: multiplier || 1
-        } 
+          timeTarget
+        }
       };
     });
-    
-    console.log('Flappy Bird result:', { completed, winnings, newWallet: out.wallet });
-    
-    res.json({ 
-      success: true, 
-      win: completed, 
-      winnings,
+
+    console.log('Flappy Bird (simplified) result:', { completed, wallet: out.wallet });
+
+    res.json({
+      success: true,
+      win: completed,
       wallet: out.wallet,
+      bet: amount,
       timeSurvived,
-      timeTarget,
-      score,
-      multiplier: multiplier || 1
+      timeTarget
     });
   } catch (err) {
     console.error('Flappy Bird Error:', err);

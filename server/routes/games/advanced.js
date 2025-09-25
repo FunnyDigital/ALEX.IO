@@ -39,29 +39,6 @@ router.post('/trade-gamble', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/games/flappy-bird
-router.post('/flappy-bird', authMiddleware, async (req, res) => {
-  try {
-    const { bet, score } = req.body; // score: number of points achieved
-    if (bet <= 0 || typeof score !== 'number' || score < 0) {
-      return res.status(400).json({ message: 'Invalid input' });
-    }
-    const user = await User.findById(req.user);
-    if (user.wallet < bet) return res.status(400).json({ message: 'Insufficient funds' });
-
-    // Simple reward logic: win if score >= 10
-    let win = false;
-    if (score >= 10) {
-      user.wallet += bet * 2;
-      win = true;
-    } else {
-      user.wallet -= bet;
-    }
-    await user.save();
-    res.json({ win, wallet: user.wallet });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+// (Removed legacy /flappy-bird route - use Firestore games route instead)
 
 module.exports = router;

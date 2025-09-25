@@ -31,13 +31,12 @@ export default function FlappyBirdScreen({ navigation }) {
   // Game States
   const [gameState, setGameState] = useState('menu'); // 'menu', 'countdown', 'playing', 'gameOver', 'celebrating', 'lost'
   const [countdown, setCountdown] = useState(3);
-  const [score, setScore] = useState(0);
+  // Score removed in simplified version
   const [timeLeft, setTimeLeft] = useState(30);
   const [targetTime, setTargetTime] = useState(30);
   const [bet, setBet] = useState('');
   const [wallet, setWallet] = useState(null);
-  const [multiplier, setMultiplier] = useState(1);
-  const [totalWinnings, setTotalWinnings] = useState(0);
+  // Multiplier & total winnings removed (even money payout)
   const [gameResult, setGameResult] = useState(null); // Store game result for celebration/loss screen
   const [resultLoading, setResultLoading] = useState(false); // Track if API is updating wallet
   
@@ -155,10 +154,8 @@ export default function FlappyBirdScreen({ navigation }) {
     // Reset game state and start countdown
     setGameState('countdown');
     setCountdown(3);
-    setScore(0);
     setTimeLeft(targetTime);
-    setMultiplier(1);
-    setTotalWinnings(0);
+  // Removed score/multiplier resets
     setBird({ x: 50, y: gameHeight / 2, velocity: 0 });
     setPipes([]);
     setBackground({ x: 0 });
@@ -204,13 +201,7 @@ export default function FlappyBirdScreen({ navigation }) {
           return 0;
         }
         
-        // Increase multiplier every second (0.5x per second)
-        const timeSurvived = targetTime - prev + 1;
-        if (timeSurvived > 0) {
-          const newMultiplier = 1 + (timeSurvived * 0.5);
-          console.log(`Time survived: ${timeSurvived}s, New multiplier: ${newMultiplier}x`);
-          setMultiplier(newMultiplier);
-        }
+        // Multiplier progression removed
         
         return prev - 1;
       });
@@ -268,12 +259,10 @@ export default function FlappyBirdScreen({ navigation }) {
         });
       }
       
-      // Check for scoring and collisions
+      // Check for collisions (scoring removed)
       newPipes.forEach(pipe => {
-        // Check if bird passed pipe
         if (!pipe.passed && birdRef.current.x > pipe.x + PIPE_WIDTH) {
-          pipe.passed = true;
-          setScore(prev => prev + 1);
+          pipe.passed = true; // maintain flag to avoid repeated processing
         }
         
         // Check collision
@@ -310,11 +299,8 @@ export default function FlappyBirdScreen({ navigation }) {
     console.log('Completed:', completed);
     console.log('Current bet:', bet);
 
-    // Calculate the current multiplier based on time survived (always positive)
-    const timeSurvived = Math.max(0, targetTime - timeLeft);
-    const currentMultiplier = 1 + (timeSurvived * 0.5);
-    console.log('Time survived:', timeSurvived);
-    console.log('Calculated multiplier:', currentMultiplier);
+  // Simplified time survived (no multiplier)
+  const timeSurvived = Math.max(0, targetTime - timeLeft);
 
     // Clear intervals
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
@@ -323,9 +309,7 @@ export default function FlappyBirdScreen({ navigation }) {
     // Always update UI state and animation immediately
     setGameResult({
       completed,
-      score,
-      multiplier: currentMultiplier,
-      winnings: completed ? parseFloat(bet) * currentMultiplier : 0,
+      winnings: completed ? parseFloat(bet) : 0,
       wallet: wallet || { balance: 0 },
       timeSurvived,
       targetTime,
@@ -362,15 +346,11 @@ export default function FlappyBirdScreen({ navigation }) {
 
     // Run API call in background, update wallet and winnings if needed
     try {
-      const totalWinnings = completed ? parseFloat(bet) * currentMultiplier : 0;
       const result = await apiService.flappyBird({
         bet: parseFloat(bet),
         completed,
         timeTarget: targetTime,
-        timeSurvived,
-        score,
-        multiplier: currentMultiplier,
-        totalWinnings
+        timeSurvived
       });
       if (result.success) {
         const newWallet = result.wallet;
@@ -378,7 +358,7 @@ export default function FlappyBirdScreen({ navigation }) {
         // Update gameResult with real winnings and wallet if API returns them
         setGameResult(prev => ({
           ...prev,
-          winnings: completed ? (result.winnings !== undefined ? result.winnings : totalWinnings) : 0,
+          winnings: completed ? parseFloat(bet) : 0,
           wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
         }));
         setResultLoading(false);
@@ -392,10 +372,8 @@ export default function FlappyBirdScreen({ navigation }) {
   const resetGame = async () => {
     setGameState('menu');
     setCountdown(3);
-    setScore(0);
     setTimeLeft(targetTime);
-    setMultiplier(1);
-    setTotalWinnings(0);
+  // Removed score/multiplier reset
     setGameResult(null);
     
     // Reset animations
@@ -644,9 +622,8 @@ export default function FlappyBirdScreen({ navigation }) {
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
               🎯 Survive {targetTime} seconds to win!{'\n'}
-              🏆 Every 5 seconds = +0.5x multiplier{'\n'}
-              💰 Win = Bet × Final Multiplier{'\n'}
-              💥 Lose = Lose bet amount only
+              💰 Win = +Bet (even money){'\n'}
+              💥 Lose = -Bet (forfeit wager)
             </Text>
           </View>
 
@@ -704,9 +681,7 @@ export default function FlappyBirdScreen({ navigation }) {
           <Text style={styles.celebrationTitle}>CONGRATULATIONS!</Text>
           <Text style={styles.celebrationSubtitle}>You're a Winner!</Text>
           <View style={styles.resultStats}>
-            <Text style={styles.statText}>Score: {gameResult.score}</Text>
             <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
-            <Text style={styles.statText}>Multiplier: {gameResult.multiplier}x</Text>
             {gameResult.isDemo ? (
               <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
             ) : resultLoading ? (
@@ -760,9 +735,7 @@ export default function FlappyBirdScreen({ navigation }) {
           </View>
           
           <View style={styles.resultStats}>
-            <Text style={styles.statText}>Score: {gameResult.score}</Text>
             <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
-            <Text style={styles.statText}>Multiplier: {gameResult.multiplier}x</Text>
             {gameResult.isDemo ? (
               <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
             ) : (
@@ -874,12 +847,7 @@ export default function FlappyBirdScreen({ navigation }) {
           
           {/* HUD */}
           <View style={styles.hud}>
-            <Text style={styles.hudText}>Score: {score}</Text>
             <Text style={styles.hudText}>Time: {timeLeft}s</Text>
-            <Text style={styles.hudText}>Multiplier: {multiplier}x</Text>
-            {totalWinnings > 0 && (
-              <Text style={styles.winningsText}>Winnings: ${totalWinnings.toFixed(2)}</Text>
-            )}
           </View>
           
           {/* Instructions */}
@@ -912,12 +880,7 @@ export default function FlappyBirdScreen({ navigation }) {
       
       {/* HUD */}
       <View style={styles.hud}>
-        <Text style={styles.hudText}>Score: {score}</Text>
         <Text style={styles.hudText}>Time: {timeLeft}s</Text>
-        <Text style={styles.hudText}>Multiplier: {multiplier}x</Text>
-        {totalWinnings > 0 && (
-          <Text style={styles.winningsText}>Winnings: ${totalWinnings.toFixed(2)}</Text>
-        )}
       </View>
       
       {/* Instructions */}
