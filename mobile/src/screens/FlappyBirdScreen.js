@@ -15,12 +15,12 @@ import { apiService } from '../config/api';
 import { auth } from '../config/firebase';
 
 const { width, height } = Dimensions.get('window');
-// Use reasonable dimensions that aren't full screen for mobile
-const gameWidth = Platform.OS === 'web' ? 800 : Math.min(width, 400);
-const gameHeight = Platform.OS === 'web' ? 600 : Math.min(height * 0.7, 600);
-const BIRD_SIZE = 30;
+// Better mobile dimensions for proper centering
+const gameWidth = Platform.OS === 'web' ? 800 : Math.min(width - 40, 380);
+const gameHeight = Platform.OS === 'web' ? 600 : Math.min(height * 0.75, 650);
+const BIRD_SIZE = 35; // Slightly bigger for better visibility
 const PIPE_WIDTH = 50;
-const PIPE_GAP = 150; // Increased from 150 to make it much easier
+const PIPE_GAP = 160; // Even more gap for mobile
 const GRAVITY = 0.3; // Increased from 0.4 to make it easier
 const JUMP_FORCE = -4; // Increased from -8 for stronger jumps
 
@@ -308,120 +308,77 @@ export default function FlappyBirdScreen({ navigation }) {
     console.log('=== GAME ENDING ===');
     console.log('Completed:', completed);
     console.log('Current bet:', bet);
-    console.log('Current multiplier:', multiplier);
-    
+
+    // Calculate the current multiplier based on time survived (always positive)
+    const timeSurvived = Math.max(0, targetTime - timeLeft);
+    const currentMultiplier = 1 + (timeSurvived * 0.5);
+    console.log('Time survived:', timeSurvived);
+    console.log('Calculated multiplier:', currentMultiplier);
+
     // Clear intervals
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
 
-    // Demo mode - don't call API but still show celebration/loss screen
-    if (bet === '0') {
-      setGameResult({
-        completed,
-        score,
-        multiplier,
-        winnings: 0, // No winnings in demo mode
-        wallet: wallet || { balance: 0 },
-        timeSurvived: targetTime - timeLeft,
-        targetTime,
-        isDemo: true
-      });
-      
-      // Set appropriate game state for UI effects
-      setGameState(completed ? 'celebrating' : 'lost');
-      
-      // Start celebration or loss animation
-      if (completed) {
-        // Start confetti animation
-        Animated.sequence([
-          Animated.timing(celebrationAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(confettiAnim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          })
-        ]).start();
-      } else {
-        // Start loss animation
-        Animated.sequence([
-          Animated.timing(celebrationAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          })
-        ]).start();
-      }
-      return;
+    // Always update UI state and animation immediately
+    setGameResult({
+      completed,
+      score,
+      multiplier: currentMultiplier,
+      winnings: completed ? parseFloat(bet) * currentMultiplier : 0,
+      wallet: wallet || { balance: 0 },
+      timeSurvived,
+      targetTime,
+      isDemo: bet === '0'
+    });
+    setGameState(completed ? 'celebrating' : 'lost');
+    if (completed) {
+      Animated.sequence([
+        Animated.timing(celebrationAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(confettiAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      ]).start();
+    } else {
+      Animated.timing(celebrationAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
     }
 
+    // If demo mode, skip API call
+    if (bet === '0') return;
+
+    // Run API call in background, update wallet and winnings if needed
     try {
-      // Send results to server for real betting
+      const totalWinnings = completed ? parseFloat(bet) * currentMultiplier : 0;
       const result = await apiService.flappyBird({
         bet: parseFloat(bet),
         completed,
         timeTarget: targetTime,
-        timeSurvived: targetTime - timeLeft,
+        timeSurvived,
         score,
-        multiplier,
+        multiplier: currentMultiplier,
         totalWinnings
       });
-      
       if (result.success) {
-        // Update wallet state immediately
         const newWallet = result.wallet;
         setWallet(newWallet);
-        console.log('Wallet updated:', newWallet);
-        
-        setGameResult({
-          completed,
-          score,
-          multiplier,
-          winnings: result.winnings || 0,
-          wallet: newWallet,
-          timeSurvived: targetTime - timeLeft,
-          targetTime
-        });
-        
-        // Set appropriate game state for UI effects
-        setGameState(completed ? 'celebrating' : 'lost');
-        
-        // Start celebration or loss animation
-        if (completed) {
-          // Start confetti animation
-          Animated.sequence([
-            Animated.timing(celebrationAnim, {
-              toValue: 1,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            Animated.timing(confettiAnim, {
-              toValue: 1,
-              duration: 2000,
-              useNativeDriver: true,
-            })
-          ]).start();
-        } else {
-          // Start loss animation (shake or fade)
-          Animated.sequence([
-            Animated.timing(celebrationAnim, {
-              toValue: 1,
-              duration: 800,
-              useNativeDriver: true,
-            })
-          ]).start();
-        }
+        // Update gameResult with real winnings and wallet if API returns them
+        setGameResult(prev => ({
+          ...prev,
+          winnings: completed ? (result.winnings !== undefined ? result.winnings : totalWinnings) : 0,
+          wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
+        }));
       }
     } catch (error) {
       console.error('Error ending game:', error);
-      if (Platform.OS === 'web') {
-        console.log('Error', 'Failed to process game result. Please try again.');
-      } else {
-        Alert.alert('Error', 'Failed to process game result. Please try again.');
-      }
     }
   };
 
@@ -466,7 +423,14 @@ export default function FlappyBirdScreen({ navigation }) {
         }
       ]}
     >
-      <Text style={styles.birdText}>�</Text> {/* Changed to forward-facing bird */}
+      {/* Fish-like character with wings */}
+      <View style={styles.fishBody}>
+        <View style={styles.fishMain} />
+        <View style={styles.fishFin} />
+        <View style={styles.fishEye} />
+        <View style={styles.fishWing} />
+        <View style={styles.fishTail} />
+      </View>
     </View>
   );
 
@@ -507,7 +471,44 @@ export default function FlappyBirdScreen({ navigation }) {
         width: gameWidth * 2
       }
     ]}>
-      <Text style={styles.backgroundText}>☁️ ☁️ ☁️ ☁️ ☁️</Text>
+      {/* Sky gradient layers */}
+      <View style={styles.skyLayer} />
+      
+      {/* Big fluffy clouds */}
+      <View style={styles.cloudsContainer}>
+        <Text style={styles.bigClouds}>☁️</Text>
+        <Text style={[styles.bigClouds, { left: 120, top: 20 }]}>☁️</Text>
+        <Text style={[styles.bigClouds, { left: 250, top: 10 }]}>☁️</Text>
+        <Text style={[styles.bigClouds, { left: 380, top: 25 }]}>☁️</Text>
+      </View>
+      
+      {/* Background buildings */}
+      <View style={styles.buildingsContainer}>
+        <View style={[styles.building, { height: 120, left: 50, backgroundColor: '#8E9AAF' }]} />
+        <View style={[styles.building, { height: 90, left: 80, backgroundColor: '#CBC0D3' }]} />
+        <View style={[styles.building, { height: 140, left: 150, backgroundColor: '#A8DADC' }]} />
+        <View style={[styles.building, { height: 110, left: 200, backgroundColor: '#F1FAEE' }]} />
+        <View style={[styles.building, { height: 95, left: 280, backgroundColor: '#E63946' }]} />
+        <View style={[styles.building, { height: 130, left: 320, backgroundColor: '#457B9D' }]} />
+      </View>
+      
+      {/* Animated swaying trees */}
+      <Animated.View style={[
+        styles.treesContainer,
+        {
+          transform: [{
+            rotate: celebrationAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['-2deg', '2deg']
+            })
+          }]
+        }
+      ]}>
+        <Text style={[styles.tree, { left: 100 }]}>🌳</Text>
+        <Text style={[styles.tree, { left: 180 }]}>🌲</Text>
+        <Text style={[styles.tree, { left: 300 }]}>🌳</Text>
+        <Text style={[styles.tree, { left: 400 }]}>🌲</Text>
+      </Animated.View>
     </View>
   );
 
@@ -673,25 +674,53 @@ export default function FlappyBirdScreen({ navigation }) {
             opacity: celebrationAnim
           }
         ]}>
-          <Text style={styles.celebrationTitle}>🎉 CONGRATULATIONS! 🎉</Text>
-          <Text style={styles.celebrationSubtitle}>You Won!</Text>
+          {/* Golden Trophy/Medal */}
+          <Animated.View style={[
+            styles.trophyContainer,
+            {
+              transform: [{
+                scale: celebrationAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 1],
+                })
+              }, {
+                rotateZ: celebrationAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '5deg'],
+                })
+              }],
+              opacity: celebrationAnim
+            }
+          ]}>
+            <View style={styles.trophyWrapper}>
+              <View style={styles.trophy}>
+                <Text style={styles.trophyIcon}>🏆</Text>
+                <View style={styles.trophyStar}>
+                  <Text style={styles.starIcon}>⭐</Text>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+
+          <Text style={styles.celebrationTitle}>CONGRATULATIONS!</Text>
+          <Text style={styles.celebrationSubtitle}>You're a Winner!</Text>
           
-          {/* Confetti Effect */}
+          {/* Enhanced Confetti Effect */}
           <Animated.View style={[
             styles.confettiContainer,
             {
               transform: [{
                 translateY: confettiAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [-50, 0],
+                  outputRange: [-30, 10],
                 })
               }],
               opacity: confettiAnim
             }
           ]}>
-            <Text style={styles.confetti}>🎊 🎉 🎊 🎉 🎊</Text>
-            <Text style={styles.confetti}>🌟 ⭐ 🌟 ⭐ 🌟</Text>
-            <Text style={styles.confetti}>🎊 🎉 🎊 🎉 🎊</Text>
+            <Text style={styles.confetti}>✨ 🎊 ✨ 🎉 ✨ 🎊 ✨</Text>
+            <Text style={styles.confetti}>🌟 💫 🌟 💫 🌟 💫 🌟</Text>
+            <Text style={styles.confetti}>🎊 ✨ 🎉 ✨ 🎊 ✨ 🎉</Text>
           </Animated.View>
           
           <View style={styles.resultStats}>
@@ -787,9 +816,8 @@ export default function FlappyBirdScreen({ navigation }) {
             {/* Background */}
             {renderBackground()}
             
-            {/* Ground and Ceiling indicators */}
+            {/* Ground indicator only */}
             <View style={styles.ground} />
-            <View style={styles.ceiling} />
             
             {/* Game Objects (static) */}
             {renderBird()}
@@ -817,9 +845,8 @@ export default function FlappyBirdScreen({ navigation }) {
         {/* Background */}
         {renderBackground()}
         
-        {/* Ground and Ceiling indicators */}
+        {/* Ground indicator only */}
         <View style={styles.ground} />
-        <View style={styles.ceiling} />
         
         {/* Game Objects (static) */}
         {renderBird()}
@@ -856,9 +883,8 @@ export default function FlappyBirdScreen({ navigation }) {
           {/* Background */}
           {renderBackground()}
           
-          {/* Ground and Ceiling indicators */}
+          {/* Ground indicator only */}
           <View style={styles.ground} />
-          <View style={styles.ceiling} />
           
           {/* Game Objects */}
           {renderBird()}
@@ -895,9 +921,8 @@ export default function FlappyBirdScreen({ navigation }) {
       {/* Background */}
       {renderBackground()}
       
-      {/* Ground and Ceiling indicators */}
+      {/* Ground indicator only */}
       <View style={styles.ground} />
-      <View style={styles.ceiling} />
       
       {/* Game Objects */}
       {renderBird()}
@@ -928,8 +953,9 @@ export default function FlappyBirdScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#87CEEB', // Sky blue background
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
   menuContainer: {
@@ -1017,17 +1043,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#654321',
     zIndex: 10,
   },
-  ceiling: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 30,
-    backgroundColor: '#696969',
-    borderBottomWidth: 2,
-    borderBottomColor: '#2F4F4F',
-    zIndex: 10,
-  },
   webGameWrapper: {
     flex: 1,
     backgroundColor: '#2c3e50',
@@ -1045,12 +1060,53 @@ const styles = StyleSheet.create({
   },
   background: {
     position: 'absolute',
-    top: 50,
+    top: 0,
+    height: '100%',
     alignItems: 'center',
   },
-  backgroundText: {
-    fontSize: 20,
-    opacity: 0.3,
+  skyLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '70%',
+    backgroundColor: 'linear-gradient(to bottom, #87CEEB, #E0F6FF)',
+  },
+  cloudsContainer: {
+    position: 'absolute',
+    top: 20,
+    width: '100%',
+    height: 100,
+  },
+  bigClouds: {
+    position: 'absolute',
+    fontSize: 40,
+    opacity: 0.8,
+    top: 0,
+  },
+  buildingsContainer: {
+    position: 'absolute',
+    bottom: 120,
+    width: '100%',
+    height: 150,
+  },
+  building: {
+    position: 'absolute',
+    width: 25,
+    bottom: 0,
+    borderRadius: 2,
+    opacity: 0.6,
+  },
+  treesContainer: {
+    position: 'absolute',
+    bottom: 100,
+    width: '100%',
+    height: 50,
+  },
+  tree: {
+    position: 'absolute',
+    fontSize: 30,
+    bottom: 0,
   },
   bird: {
     position: 'absolute',
@@ -1060,8 +1116,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 100,
   },
-  birdText: {
-    fontSize: 25,
+  fishBody: {
+    position: 'relative',
+    width: BIRD_SIZE,
+    height: BIRD_SIZE,
+  },
+  fishMain: {
+    position: 'absolute',
+    width: BIRD_SIZE * 0.8,
+    height: BIRD_SIZE * 0.6,
+    backgroundColor: '#4A90E2',
+    borderRadius: BIRD_SIZE * 0.3,
+    top: BIRD_SIZE * 0.2,
+    left: BIRD_SIZE * 0.1,
+    borderWidth: 2,
+    borderColor: '#2E5C8A',
+  },
+  fishFin: {
+    position: 'absolute',
+    width: BIRD_SIZE * 0.3,
+    height: BIRD_SIZE * 0.4,
+    backgroundColor: '#6A5ACD',
+    borderRadius: BIRD_SIZE * 0.15,
+    top: BIRD_SIZE * 0.1,
+    left: BIRD_SIZE * 0.05,
+    transform: [{ rotate: '30deg' }],
+  },
+  fishWing: {
+    position: 'absolute',
+    width: BIRD_SIZE * 0.4,
+    height: BIRD_SIZE * 0.3,
+    backgroundColor: '#8A2BE2',
+    borderRadius: BIRD_SIZE * 0.15,
+    top: BIRD_SIZE * 0.3,
+    right: BIRD_SIZE * 0.05,
+    transform: [{ rotate: '-20deg' }],
+  },
+  fishEye: {
+    position: 'absolute',
+    width: BIRD_SIZE * 0.15,
+    height: BIRD_SIZE * 0.15,
+    backgroundColor: 'white',
+    borderRadius: BIRD_SIZE * 0.075,
+    top: BIRD_SIZE * 0.25,
+    left: BIRD_SIZE * 0.5,
+    borderWidth: 1,
+    borderColor: '#000',
+  },
+  fishTail: {
+    position: 'absolute',
+    width: BIRD_SIZE * 0.25,
+    height: BIRD_SIZE * 0.4,
+    backgroundColor: '#6A5ACD',
+    borderRadius: BIRD_SIZE * 0.1,
+    top: BIRD_SIZE * 0.3,
+    left: -BIRD_SIZE * 0.1,
+    transform: [{ rotate: '45deg' }],
   },
   pipe: {
     position: 'absolute',
@@ -1179,28 +1289,40 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   playAgainButton: {
-    backgroundColor: '#2E8B57',
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 20,
-    marginBottom: 10,
-    minWidth: 150,
+    backgroundColor: '#8E24AA',
+    paddingVertical: 15,
+    paddingHorizontal: 35,
+    borderRadius: 25,
+    marginBottom: 15,
+    minWidth: 200,
+    shadowColor: '#6A1B9A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#9C27B0',
   },
   playAgainButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   menuButton: {
-    backgroundColor: '#666',
-    paddingHorizontal: 25,
+    backgroundColor: 'rgba(158, 158, 158, 0.2)',
     paddingVertical: 12,
-    borderRadius: 20,
-    minWidth: 150,
+    paddingHorizontal: 35,
+    borderRadius: 25,
+    minWidth: 200,
+    borderWidth: 2,
+    borderColor: 'rgba(117, 117, 117, 0.4)',
   },
   menuButtonText: {
-    color: 'white',
+    color: '#757575',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -1306,45 +1428,93 @@ const styles = StyleSheet.create({
   // Celebration Screen Styles
   celebrationContainer: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6A1B9A', // Purple gradient base
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   celebrationCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 25,
+    padding: 35,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 350,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
+    maxWidth: 370,
+    shadowColor: '#4A148C',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    elevation: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  trophyContainer: {
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  trophyWrapper: {
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderRadius: 50,
+    padding: 20,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+  },
+  trophy: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trophyIcon: {
+    fontSize: 60,
+    color: '#FFD700',
+    textShadowColor: '#FFA000',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  trophyStar: {
+    position: 'absolute',
+    top: -5,
+    right: -10,
+    backgroundColor: '#FFD700',
+    borderRadius: 12,
+    padding: 3,
+    borderWidth: 2,
+    borderColor: '#FFA000',
+  },
+  starIcon: {
+    fontSize: 16,
+    color: '#FFA000',
   },
   celebrationTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#6A1B9A',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
+    textShadowColor: 'rgba(106, 27, 154, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    letterSpacing: 1,
   },
   celebrationSubtitle: {
     fontSize: 18,
-    color: '#666',
+    color: '#8E24AA',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 25,
+    fontWeight: '600',
   },
   confettiContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 25,
   },
   confetti: {
-    fontSize: 24,
+    fontSize: 20,
     textAlign: 'center',
-    marginVertical: 2,
+    marginVertical: 3,
+    opacity: 0.9,
+    textShadowColor: 'rgba(255, 215, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   
   // Loss Screen Styles

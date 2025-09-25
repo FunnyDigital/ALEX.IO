@@ -456,31 +456,86 @@ function FlappyBirdGame() {
                             alignItems: 'center', 
                             gap: 20, 
                             width: '100%',
-                            padding: 20,
-                            backgroundColor: '#4CAF50',
-                            borderRadius: 15,
-                            textAlign: 'center'
+                            padding: 35,
+                            background: 'linear-gradient(135deg, #6A1B9A 0%, #8E24AA 50%, #9C27B0 100%)',
+                            borderRadius: 25,
+                            textAlign: 'center',
+                            boxShadow: '0 8px 32px rgba(106, 27, 154, 0.4)',
+                            border: '3px solid rgba(255, 215, 0, 0.3)',
+                            position: 'relative',
+                            overflow: 'hidden'
                         }}>
-                            <div style={{ fontSize: 32, marginBottom: 10 }}>
-                                🎉 CONGRATULATIONS! 🎉
+                            {/* Golden Trophy */}
+                            <div style={{
+                                backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                                borderRadius: '50%',
+                                padding: '20px',
+                                border: '3px solid rgba(255, 215, 0, 0.4)',
+                                position: 'relative',
+                                marginBottom: 10
+                            }}>
+                                <div style={{ 
+                                    fontSize: 60, 
+                                    filter: 'drop-shadow(2px 2px 4px rgba(255, 160, 0, 0.8))',
+                                    position: 'relative'
+                                }}>
+                                    🏆
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '-5px',
+                                        right: '-10px',
+                                        backgroundColor: '#FFD700',
+                                        borderRadius: '50%',
+                                        padding: '3px',
+                                        border: '2px solid #FFA000',
+                                        fontSize: '16px'
+                                    }}>⭐</div>
+                                </div>
+                            </div>
+                            
+                            <div style={{ 
+                                fontSize: 28, 
+                                fontWeight: 'bold',
+                                color: 'white',
+                                textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                                letterSpacing: '1px',
+                                marginBottom: 5
+                            }}>
+                                CONGRATULATIONS!
                             </div>
                             <h2 style={{
-                                fontSize: 24,
-                                fontWeight: 700,
-                                color: 'white',
-                                margin: 0
+                                fontSize: 18,
+                                fontWeight: 600,
+                                color: 'rgba(255, 255, 255, 0.9)',
+                                margin: 0,
+                                marginBottom: 20
                             }}>
-                                You Won!
+                                You're a Winner!
                             </h2>
                             
-                            {/* Confetti Effect */}
-                            <div style={{ fontSize: 24, lineHeight: 1.2, color: 'white' }}>
-                                🎊 🎉 🎊 🎉 🎊<br/>
-                                🌟 ⭐ 🌟 ⭐ 🌟<br/>
-                                🎊 🎉 🎊 🎉 🎊
+                            {/* Enhanced Confetti Effect */}
+                            <div style={{ 
+                                fontSize: 20, 
+                                lineHeight: 1.4, 
+                                color: 'white',
+                                textShadow: '1px 1px 2px rgba(255, 215, 0, 0.3)',
+                                marginBottom: 15
+                            }}>
+                                ✨ 🎊 ✨ 🎉 ✨  ✨<br/>
+                                🌟 💫 🌟 💫 🌟 💫 🌟<br/>
+                                🎊 ✨ 🎉 ✨ 🎊 ✨ �
                             </div>
                             
-                            <div style={{ color: 'white', fontSize: 16, lineHeight: 1.6 }}>
+                            <div style={{ 
+                                color: 'white', 
+                                fontSize: 16, 
+                                lineHeight: 1.6,
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                padding: '15px',
+                                borderRadius: '15px',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                marginBottom: 10
+                            }}>
                                 <div><strong>Score:</strong> {result.score}</div>
                                 <div><strong>Time:</strong> {result.time}s / {targetTime}s</div>
                                 <div><strong>Multiplier:</strong> {result.multiplier}x</div>
@@ -489,17 +544,44 @@ function FlappyBirdGame() {
                             </div>
                             
                             <button onClick={handleAgain} style={{
-                                backgroundColor: 'white',
-                                color: '#4CAF50',
-                                border: 'none',
-                                padding: '12px 24px',
-                                borderRadius: 8,
-                                fontSize: 16,
-                                fontWeight: 600,
+                                background: 'linear-gradient(135deg, #8E24AA 0%, #9C27B0 100%)',
+                                color: 'white',
+                                border: '2px solid #9C27B0',
+                                padding: '15px 35px',
+                                borderRadius: 25,
+                                fontSize: 18,
+                                fontWeight: 700,
                                 cursor: 'pointer',
-                                marginTop: 10
-                            }}>
+                                marginTop: 10,
+                                minWidth: '200px',
+                                boxShadow: '0 4px 15px rgba(106, 27, 154, 0.3)',
+                                textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                                transition: 'all 0.3s ease'
+                            }}
+                            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                            onMouseOut={(e) => e.target.style.transform = 'translateY(0px)'}
+                            >
                                 Play Again
+                            </button>
+                            
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                style={{
+                                    backgroundColor: 'rgba(158, 158, 158, 0.2)',
+                                    color: '#757575',
+                                    border: '2px solid rgba(117, 117, 117, 0.4)',
+                                    padding: '12px 35px',
+                                    borderRadius: 25,
+                                    fontSize: 16,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    minWidth: '200px',
+                                    transition: 'all 0.3s ease'
+                                }}
+                                onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(158, 158, 158, 0.3)'}
+                                onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(158, 158, 158, 0.2)'}
+                            >
+                                Back to Main Menu
                             </button>
                         </div>
                     )}
