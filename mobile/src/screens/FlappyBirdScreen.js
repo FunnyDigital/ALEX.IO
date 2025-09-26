@@ -38,7 +38,6 @@ export default function FlappyBirdScreen({ navigation }) {
   const [wallet, setWallet] = useState(null);
   // Multiplier & total winnings removed (even money payout)
   const [gameResult, setGameResult] = useState(null); // Store game result for celebration/loss screen
-  const [resultLoading, setResultLoading] = useState(false); // Track if API is updating wallet
   
   // Game Objects
   const [bird, setBird] = useState({ x: 50, y: gameHeight / 2, velocity: 0 });
@@ -315,7 +314,6 @@ export default function FlappyBirdScreen({ navigation }) {
       targetTime,
       isDemo: bet === '0'
     });
-    setResultLoading(bet !== '0');
     setGameState(completed ? 'celebrating' : 'lost');
     if (completed) {
       Animated.sequence([
@@ -340,45 +338,26 @@ export default function FlappyBirdScreen({ navigation }) {
 
     // If demo mode, skip API call
     if (bet === '0') {
-      setResultLoading(false);
       return;
     }
 
-    // Run API call in background, update wallet and winnings if needed
+    // Run API call in background for settlement
     try {
+      console.log('Starting flappyBird API call...');
       const result = await apiService.flappyBird({
         bet: parseFloat(bet),
         completed,
         timeTarget: targetTime,
         timeSurvived
       });
+      console.log('FlappyBird API result:', result);
+      
       if (result.success) {
-        // Fetch fresh wallet balance from Firestore after API call
-        try {
-          const walletResponse = await apiService.getWallet();
-          const newWallet = walletResponse.data || walletResponse;
-          setWallet(newWallet);
-          // Update gameResult with real winnings and wallet from Firestore
-          setGameResult(prev => ({
-            ...prev,
-            winnings: completed ? parseFloat(bet) : 0,
-            wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
-          }));
-        } catch (walletError) {
-          console.error('Error fetching wallet after game:', walletError);
-          // Fallback to API response wallet
-          const newWallet = result.wallet;
-          setWallet(newWallet);
-          setGameResult(prev => ({
-            ...prev,
-            winnings: completed ? parseFloat(bet) : 0,
-            wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
-          }));
-        }
-        setResultLoading(false);
+        console.log('Game settled successfully');
+      } else {
+        console.error('API call failed:', result);
       }
     } catch (error) {
-      setResultLoading(false);
       console.error('Error ending game:', error);
     }
   };
@@ -699,10 +678,7 @@ export default function FlappyBirdScreen({ navigation }) {
             {gameResult.isDemo ? (
               <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
             ) : (
-              <>
-                <Text style={styles.winningsText}>Winnings: ${gameResult.winnings.toFixed(2)}</Text>
-                <Text style={styles.balanceText}>New Balance: ${(wallet && typeof wallet.balance === 'number' ? wallet.balance : (typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet)).toFixed(2)}</Text>
-              </>
+              <Text style={styles.winningsText}>You Won: +${gameResult.winnings.toFixed(2)}</Text>
             )}
           </View>
           
@@ -751,10 +727,7 @@ export default function FlappyBirdScreen({ navigation }) {
             {gameResult.isDemo ? (
               <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
             ) : (
-              <>
-                <Text style={styles.lossText}>Bet Lost: ${parseFloat(bet).toFixed(2)}</Text>
-                <Text style={styles.balanceText}>New Balance: ${(typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet).toFixed(2)}</Text>
-              </>
+              <Text style={styles.lossText}>You Lost: -${parseFloat(bet).toFixed(2)}</Text>
             )}
           </View>
           
@@ -967,17 +940,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   backButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#34495e',
     borderWidth: 2,
-    borderColor: '#FFD700',
-    borderRadius: 10,
+    borderColor: '#2c3e50',
+    borderRadius: 25,
     padding: 15,
     width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   backButtonText: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     textAlign: 'center',
   },
   gameContainer: {
@@ -1272,20 +1250,25 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   menuButton: {
-    backgroundColor: 'rgba(158, 158, 158, 0.2)',
-    paddingVertical: 10,
+    backgroundColor: '#34495e',
+    paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 25,
     width: '80%',
     maxWidth: 200,
     borderWidth: 2,
-    borderColor: 'rgba(117, 117, 117, 0.4)',
+    borderColor: '#2c3e50',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   menuButtonText: {
-    color: '#757575',
+    color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     textAlign: 'center',
   },
   menuCard: {
