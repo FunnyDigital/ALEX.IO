@@ -19,10 +19,10 @@ const { width, height } = Dimensions.get('window');
 const gameWidth = Platform.OS === 'web' ? 800 : Math.min(width - 40, 380);
 const gameHeight = Platform.OS === 'web' ? 600 : Math.min(height * 0.75, 650);
 const BIRD_SIZE = 35; // Slightly bigger for better visibility
-const PIPE_WIDTH = 50;
-const PIPE_GAP = 160; // Even more gap for mobile
-const GRAVITY = 0.3; // Increased from 0.4 to make it easier
-const JUMP_FORCE = -4; // Increased from -8 for stronger jumps
+const PIPE_WIDTH = 52;
+const PIPE_GAP = 180; // Even more gap for mobile
+const GRAVITY = 0.6; // Increased from 0.3 to make it easier
+const JUMP_FORCE = -7; // Reduced jump force for smoother control
 
 export default function FlappyBirdScreen({ navigation }) {
   // Error handling
@@ -353,14 +353,28 @@ export default function FlappyBirdScreen({ navigation }) {
         timeSurvived
       });
       if (result.success) {
-        const newWallet = result.wallet;
-        setWallet(newWallet);
-        // Update gameResult with real winnings and wallet if API returns them
-        setGameResult(prev => ({
-          ...prev,
-          winnings: completed ? parseFloat(bet) : 0,
-          wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
-        }));
+        // Fetch fresh wallet balance from Firestore after API call
+        try {
+          const walletResponse = await apiService.getWallet();
+          const newWallet = walletResponse.data || walletResponse;
+          setWallet(newWallet);
+          // Update gameResult with real winnings and wallet from Firestore
+          setGameResult(prev => ({
+            ...prev,
+            winnings: completed ? parseFloat(bet) : 0,
+            wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
+          }));
+        } catch (walletError) {
+          console.error('Error fetching wallet after game:', walletError);
+          // Fallback to API response wallet
+          const newWallet = result.wallet;
+          setWallet(newWallet);
+          setGameResult(prev => ({
+            ...prev,
+            winnings: completed ? parseFloat(bet) : 0,
+            wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
+          }));
+        }
         setResultLoading(false);
       }
     } catch (error) {
@@ -684,12 +698,10 @@ export default function FlappyBirdScreen({ navigation }) {
             <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
             {gameResult.isDemo ? (
               <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
-            ) : resultLoading ? (
-              <Text style={styles.balanceText}>Updating balance...</Text>
             ) : (
               <>
                 <Text style={styles.winningsText}>Winnings: ${gameResult.winnings.toFixed(2)}</Text>
-                <Text style={styles.balanceText}>New Balance: {(wallet && typeof wallet.balance === 'number' ? wallet.balance : (typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet)).toFixed(2)}</Text>
+                <Text style={styles.balanceText}>New Balance: ${(wallet && typeof wallet.balance === 'number' ? wallet.balance : (typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet)).toFixed(2)}</Text>
               </>
             )}
           </View>
