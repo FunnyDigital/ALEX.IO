@@ -38,11 +38,11 @@ function MainTabNavigator() {
         tabBarActiveTintColor: '#FFD700',
         tabBarInactiveTintColor: 'gray',
         headerStyle: {
-          backgroundColor: '#1a1a2e',
+          backgroundColor: '#09090aff',
         },
-        headerTintColor: '#fff',
+        headerTintColor: '#000000ff',
         tabBarStyle: {
-          backgroundColor: '#1a1a2e',
+          backgroundColor: '#000000ff',
         },
       })}
     >
@@ -61,7 +61,7 @@ export default function AppNavigator({ user }) {
         initialRouteName={user ? "Main" : "Auth"}
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#1a1a2e',
+            backgroundColor: '#4747d3ff',
           },
           headerTintColor: '#fff',
           headerTitleStyle: {

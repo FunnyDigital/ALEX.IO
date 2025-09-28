@@ -13,7 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { auth, db } from '../config/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { apiService } from '../config/api';
 
 // Conditionally import Paystack only for mobile
@@ -28,9 +28,7 @@ if (Platform.OS !== 'web') {
 }
 
 export default function WalletScreen() {
-  const [withdrawAmount, setWithdrawAmount] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
-  const [bankDetails, setBankDetails] = useState({ account_number: '', bank_code: '' });
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPaystack, setShowPaystack] = useState(false);
@@ -66,26 +64,6 @@ export default function WalletScreen() {
       if (unsubscribe) unsubscribe();
     };
   }, []);
-
-  const handleWithdraw = async () => {
-    if (!withdrawAmount || isNaN(withdrawAmount) || Number(withdrawAmount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid withdrawal amount');
-      return;
-    }
-
-    try {
-      const res = await apiService.withdrawWallet(Number(withdrawAmount));
-      
-      if (res.data?.wallet !== undefined) {
-        setWithdrawAmount('');
-        Alert.alert('Success', 'Withdrawal successful!');
-      } else {
-        Alert.alert('Error', res.data?.message || 'Withdrawal failed');
-      }
-    } catch (err) {
-      Alert.alert('Error', err.response?.data?.message || 'Withdrawal failed. Please try again.');
-    }
-  };
 
   const handleDeposit = () => {
     if (!depositAmount || isNaN(depositAmount) || Number(depositAmount) <= 0) {
@@ -266,25 +244,6 @@ export default function WalletScreen() {
         </Text>
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickActionDeposit} onPress={handleDeposit} disabled={paymentInProgress}>
-          <View style={styles.quickActionIcon}>
-            <Text style={styles.quickActionEmoji}>💳</Text>
-          </View>
-          <Text style={styles.quickActionText}>
-            {paymentInProgress ? 'Processing...' : 'Add Money'}
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.quickActionWithdraw} onPress={handleWithdraw}>
-          <View style={styles.quickActionIcon}>
-            <Text style={styles.quickActionEmoji}>🏦</Text>
-          </View>
-          <Text style={styles.quickActionText}>Withdraw</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Deposit Section */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -294,87 +253,35 @@ export default function WalletScreen() {
         
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Amount to Deposit</Text>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.currencySymbol}>₦</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Minimum ₦100"
-              placeholderTextColor="#666"
-              value={depositAmount}
-              onChangeText={setDepositAmount}
-              keyboardType="numeric"
-            />
-          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="₦ Enter amount (Minimum ₦100)"
+            placeholderTextColor="#666"
+            value={depositAmount}
+            onChangeText={setDepositAmount}
+            keyboardType="numeric"
+          />
         </View>
         
-        <TouchableOpacity 
-          style={[styles.depositButton, paymentInProgress && styles.buttonDisabled]} 
-          onPress={handleDeposit}
-          disabled={paymentInProgress}
-        >
-          <View style={styles.buttonContent}>
-            <Text style={styles.buttonIcon}>🔒</Text>
-            <Text style={styles.depositButtonText}>
-              {paymentInProgress ? 'Processing Payment...' : 'Pay with Paystack'}
-            </Text>
-          </View>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.addMoneyButton, paymentInProgress && styles.buttonDisabled]} 
+            onPress={handleDeposit}
+            disabled={paymentInProgress}
+          >
+            <View style={styles.buttonContent}>
+              <Text style={styles.buttonIcon}>💰</Text>
+              <Text style={styles.buttonText}>
+                {paymentInProgress ? 'Processing...' : 'Add Money'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
         
         <View style={styles.securityNote}>
           <Text style={styles.securityText}>🔐 Secured by Paystack • Your data is encrypted</Text>
         </View>
-      </View>
-
-      {/* Withdraw Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>🏦 Withdraw Money</Text>
-          <Text style={styles.sectionDescription}>Transfer funds to your bank account</Text>
-        </View>
-        
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Withdrawal Amount</Text>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.currencySymbol}>₦</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter amount"
-              placeholderTextColor="#666"
-              value={withdrawAmount}
-              onChangeText={setWithdrawAmount}
-              keyboardType="numeric"
-            />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Bank Details</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Account Number"
-            placeholderTextColor="#666"
-            value={bankDetails.account_number}
-            onChangeText={(text) => setBankDetails({...bankDetails, account_number: text})}
-            keyboardType="numeric"
-          />
-          <TextInput
-            style={[styles.input, { marginTop: 10 }]}
-            placeholder="Bank Code (e.g., 011 for GTBank)"
-            placeholderTextColor="#666"
-            value={bankDetails.bank_code}
-            onChangeText={(text) => setBankDetails({...bankDetails, bank_code: text})}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={styles.withdrawButton}
-          onPress={handleWithdraw}
-        >
-          <View style={styles.buttonContent}>
-            <Text style={styles.buttonIcon}>📤</Text>
-            <Text style={styles.withdrawButtonText}>Request Withdrawal</Text>
-          </View>
-        </TouchableOpacity>
       </View>
 
       {/* Transaction History */}
@@ -386,7 +293,7 @@ export default function WalletScreen() {
         <View style={styles.historyPlaceholder}>
           <Text style={styles.historyIcon}>📝</Text>
           <Text style={styles.historyTitle}>No transactions yet</Text>
-          <Text style={styles.historyText}>Your recent deposits and withdrawals will appear here</Text>
+          <Text style={styles.historyText}>Your recent deposits will appear here</Text>
         </View>
       </View>
 
@@ -493,6 +400,35 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 15,
   },
+  actionButtons: {
+    alignItems: 'center',
+    marginBottom: 20,
+    marginHorizontal: 20,
+  },
+  actionButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 15,
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+    height: 65,
+    minWidth: 200,
+  },
+  addMoneyButton: {
+    backgroundColor: '#4CAF50',
+    shadowColor: '#4CAF50',
+  },
+  addMoneyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   quickActionDeposit: {
     flex: 1,
     backgroundColor: '#4CAF50',
@@ -500,18 +436,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  quickActionWithdraw: {
-    flex: 1,
-    backgroundColor: '#FF6B6B',
-    padding: 20,
-    borderRadius: 15,
-    alignItems: 'center',
-    shadowColor: '#FF6B6B',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -548,11 +472,29 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 20,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFD700',
-    marginBottom: 5,
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   sectionDescription: {
     fontSize: 14,
@@ -568,33 +510,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontWeight: '600',
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#333',
-    paddingHorizontal: 15,
-    minHeight: 55,
-  },
-  currencySymbol: {
-    fontSize: 18,
-    color: '#FFD700',
-    fontWeight: 'bold',
-    marginRight: 10,
-  },
   input: {
-    flex: 1,
     fontSize: 16,
     color: '#fff',
-    paddingVertical: 15,
-    paddingHorizontal: 15,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#333',
-    minHeight: 55,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#444',
+    minHeight: 60,
+    textAlign: 'left',
   },
   depositButton: {
     backgroundColor: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
@@ -608,32 +534,41 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
-  withdrawButton: {
-    backgroundColor: 'linear-gradient(135deg, #FF6B6B 0%, #ee5a52 100%)',
-    borderRadius: 15,
-    padding: 18,
-    alignItems: 'center',
-    shadowColor: '#FF6B6B',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'nowrap',
   },
   buttonIcon: {
-    fontSize: 18,
-    marginRight: 10,
+    fontSize: 16,
+    marginRight: 6,
+    lineHeight: 20,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
   },
   depositButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
-  withdrawButtonText: {
-    color: '#fff',
+  cancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#555',
+    borderRadius: 15,
+    padding: 18,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  cancelButtonText: {
+    color: '#999',
     fontSize: 16,
     fontWeight: 'bold',
   },
