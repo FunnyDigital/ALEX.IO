@@ -8,16 +8,33 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
+  Platform,
+  Linking,
 } from 'react-native';
 import { auth, db } from '../config/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { apiService } from '../config/api';
 
+// Conditionally import Paystack only for mobile
+let Paystack = null;
+if (Platform.OS !== 'web') {
+  try {
+    const PaystackModule = require('react-native-paystack-webview');
+    Paystack = PaystackModule.Paystack;
+  } catch (error) {
+    console.log('Paystack not available for this platform');
+  }
+}
+
 export default function WalletScreen() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
   const [bankDetails, setBankDetails] = useState({ account_number: '', bank_code: '' });
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showPaystack, setShowPaystack] = useState(false);
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
 
   const fetchProfile = async () => {
     try {
@@ -71,7 +88,150 @@ export default function WalletScreen() {
   };
 
   const handleDeposit = () => {
-    Alert.alert('Deposit', 'Deposit functionality will be implemented with Paystack integration');
+    if (!depositAmount || isNaN(depositAmount) || Number(depositAmount) <= 0) {
+      Alert.alert('Error', 'Please enter a valid deposit amount');
+      return;
+    }
+
+    if (Number(depositAmount) < 100) {
+      Alert.alert('Error', 'Minimum deposit amount is ₦100');
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      // For web, open Paystack payment page directly
+      handleWebPayment();
+    } else if (Paystack) {
+      // For mobile, use the WebView component
+      setShowPaystack(true);
+    } else {
+      Alert.alert('Error', 'Payment not available on this platform');
+    }
+  };
+
+  const handleDemoPayment = () => {
+    Alert.alert(
+      'Demo Payment Mode',
+      `This will simulate a deposit of ₦${depositAmount}.\n\nTo use real Paystack:\n1. Go to your Paystack Dashboard\n2. Copy your Public Key (starts with pk_test_)\n3. Replace the key in the code\n\nProceed with demo?`,
+      [
+        { text: 'Cancel', onPress: () => setPaymentInProgress(false) },
+        { text: 'Demo Deposit', onPress: () => {
+          setPaymentInProgress(true);
+          simulatePayment(`demo_${Date.now()}`);
+        }}
+      ]
+    );
+  };
+
+  const handleWebPayment = async () => {
+    try {
+      setPaymentInProgress(true);
+      
+      // Generate a unique reference for this transaction
+      const reference = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      if (typeof window !== 'undefined' && window.PaystackPop) {
+        // Use Paystack Inline if available
+        const handler = window.PaystackPop.setup({
+          key: 'pk_test_019f033625483fdf933f93654941a531e6b14efc',
+          email: auth.currentUser?.email || 'user@example.com',
+          amount: Number(depositAmount) * 100,
+          currency: 'NGN',
+          ref: reference,
+          callback: function(response) {
+            console.log('Payment success:', response);
+            handlePaymentSuccess(response);
+          },
+          onClose: function() {
+            console.log('Payment cancelled');
+            handlePaymentCancel();
+          }
+        });
+        handler.openIframe();
+      } else {
+        // Fallback: Load Paystack script dynamically
+        loadPaystackScript(() => {
+          const handler = window.PaystackPop.setup({
+            key: 'pk_test_019f033625483fdf933f93654941a531e6b14efc',
+            email: auth.currentUser?.email || 'user@example.com',
+            amount: Number(depositAmount) * 100,
+            currency: 'NGN',
+            ref: reference,
+            callback: function(response) {
+              console.log('Payment success:', response);
+              handlePaymentSuccess(response);
+            },
+            onClose: function() {
+              console.log('Payment cancelled');
+              handlePaymentCancel();
+            }
+          });
+          handler.openIframe();
+        });
+      }
+      
+    } catch (error) {
+      console.error('Web payment error:', error);
+      Alert.alert('Error', 'Failed to initialize payment');
+      setPaymentInProgress(false);
+    }
+  };
+
+  const loadPaystackScript = (callback) => {
+    if (typeof window === 'undefined') return;
+    
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.onload = callback;
+    script.onerror = () => {
+      console.error('Failed to load Paystack script');
+      // Fallback to demo mode
+      Alert.alert(
+        'Demo Payment',
+        `Simulating deposit of ₦${depositAmount}.\n\nIn production, this would open Paystack payment.`,
+        [
+          { text: 'Cancel', onPress: () => setPaymentInProgress(false) },
+          { text: 'Continue Demo', onPress: () => simulatePayment(`demo_${Date.now()}`) }
+        ]
+      );
+    };
+    document.head.appendChild(script);
+  };
+
+  const simulatePayment = (reference) => {
+    // Simulate a successful payment for demo purposes
+    setTimeout(() => {
+      handlePaymentSuccess({ reference });
+    }, 1000);
+  };
+
+  const handlePaymentSuccess = async (res) => {
+    console.log('Payment successful:', res);
+    setPaymentInProgress(true);
+    setShowPaystack(false);
+
+    try {
+      // Call backend to verify payment and update wallet
+      const response = await apiService.depositWallet(res.reference, Number(depositAmount));
+      
+      if (response.data?.success) {
+        Alert.alert('Success', `₦${depositAmount} has been added to your wallet!`);
+        setDepositAmount('');
+      } else {
+        Alert.alert('Error', response.data?.message || 'Payment verification failed');
+      }
+    } catch (error) {
+      console.error('Deposit verification error:', error);
+      Alert.alert('Error', 'Failed to verify payment. Please contact support if money was deducted.');
+    } finally {
+      setPaymentInProgress(false);
+    }
+  };
+
+  const handlePaymentCancel = () => {
+    console.log('Payment cancelled');
+    setShowPaystack(false);
+    Alert.alert('Cancelled', 'Payment was cancelled');
   };
 
   if (loading) {
@@ -83,63 +243,174 @@ export default function WalletScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Current Balance</Text>
-        <Text style={styles.balanceAmount}>₦{profile?.wallet?.toLocaleString() || '0'}</Text>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>My Wallet</Text>
+        <Text style={styles.headerSubtitle}>Manage your funds</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Deposit Money</Text>
-        <TouchableOpacity style={styles.depositButton} onPress={handleDeposit}>
-          <Text style={styles.depositButtonText}>Deposit with Paystack</Text>
+      {/* Balance Card */}
+      <View style={styles.balanceCard}>
+        <View style={styles.balanceHeader}>
+          <Text style={styles.balanceLabel}>Available Balance</Text>
+          <View style={styles.balanceIcon}>
+            <Text style={styles.balanceEmoji}>💰</Text>
+          </View>
+        </View>
+        <Text style={styles.balanceAmount}>
+          ₦{profile?.wallet?.toLocaleString() || '0.00'}
+        </Text>
+        <Text style={styles.balanceSubtext}>
+          Ready to use • Last updated now
+        </Text>
+      </View>
+
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity style={styles.quickActionDeposit} onPress={handleDeposit} disabled={paymentInProgress}>
+          <View style={styles.quickActionIcon}>
+            <Text style={styles.quickActionEmoji}>💳</Text>
+          </View>
+          <Text style={styles.quickActionText}>
+            {paymentInProgress ? 'Processing...' : 'Add Money'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.quickActionWithdraw} onPress={handleWithdraw}>
+          <View style={styles.quickActionIcon}>
+            <Text style={styles.quickActionEmoji}>🏦</Text>
+          </View>
+          <Text style={styles.quickActionText}>Withdraw</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Deposit Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Withdraw Money</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>💳 Deposit Money</Text>
+          <Text style={styles.sectionDescription}>Add funds to your wallet securely</Text>
+        </View>
         
-        <TextInput
-          style={styles.input}
-          placeholder="Withdrawal Amount"
-          placeholderTextColor="#666"
-          value={withdrawAmount}
-          onChangeText={setWithdrawAmount}
-          keyboardType="numeric"
-        />
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Amount to Deposit</Text>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.currencySymbol}>₦</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Minimum ₦100"
+              placeholderTextColor="#666"
+              value={depositAmount}
+              onChangeText={setDepositAmount}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+        
+        <TouchableOpacity 
+          style={[styles.depositButton, paymentInProgress && styles.buttonDisabled]} 
+          onPress={handleDeposit}
+          disabled={paymentInProgress}
+        >
+          <View style={styles.buttonContent}>
+            <Text style={styles.buttonIcon}>🔒</Text>
+            <Text style={styles.depositButtonText}>
+              {paymentInProgress ? 'Processing Payment...' : 'Pay with Paystack'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        
+        <View style={styles.securityNote}>
+          <Text style={styles.securityText}>🔐 Secured by Paystack • Your data is encrypted</Text>
+        </View>
+      </View>
 
-        <Text style={styles.inputLabel}>Bank Details</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Account Number"
-          placeholderTextColor="#666"
-          value={bankDetails.account_number}
-          onChangeText={(text) => setBankDetails({...bankDetails, account_number: text})}
-          keyboardType="numeric"
-        />
+      {/* Withdraw Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>🏦 Withdraw Money</Text>
+          <Text style={styles.sectionDescription}>Transfer funds to your bank account</Text>
+        </View>
+        
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Withdrawal Amount</Text>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.currencySymbol}>₦</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter amount"
+              placeholderTextColor="#666"
+              value={withdrawAmount}
+              onChangeText={setWithdrawAmount}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Bank Code"
-          placeholderTextColor="#666"
-          value={bankDetails.bank_code}
-          onChangeText={(text) => setBankDetails({...bankDetails, bank_code: text})}
-        />
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Bank Details</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Account Number"
+            placeholderTextColor="#666"
+            value={bankDetails.account_number}
+            onChangeText={(text) => setBankDetails({...bankDetails, account_number: text})}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={[styles.input, { marginTop: 10 }]}
+            placeholder="Bank Code (e.g., 011 for GTBank)"
+            placeholderTextColor="#666"
+            value={bankDetails.bank_code}
+            onChangeText={(text) => setBankDetails({...bankDetails, bank_code: text})}
+          />
+        </View>
 
         <TouchableOpacity
           style={styles.withdrawButton}
           onPress={handleWithdraw}
         >
-          <Text style={styles.withdrawButtonText}>Request Withdrawal</Text>
+          <View style={styles.buttonContent}>
+            <Text style={styles.buttonIcon}>📤</Text>
+            <Text style={styles.withdrawButtonText}>Request Withdrawal</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
+      {/* Transaction History */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Transaction History</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>📊 Recent Transactions</Text>
+          <Text style={styles.sectionDescription}>Your transaction history</Text>
+        </View>
         <View style={styles.historyPlaceholder}>
-          <Text style={styles.historyText}>Transaction history will be displayed here</Text>
+          <Text style={styles.historyIcon}>📝</Text>
+          <Text style={styles.historyTitle}>No transactions yet</Text>
+          <Text style={styles.historyText}>Your recent deposits and withdrawals will appear here</Text>
         </View>
       </View>
+
+      {/* Paystack Payment Modal - Mobile Only */}
+      {Platform.OS !== 'web' && Paystack && (
+        <Modal
+          visible={showPaystack}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setShowPaystack(false)}
+        >
+          <Paystack
+            paystackKey="pk_test_019f033625483fdf933f93654941a531e6b14efc"
+            amount={depositAmount}
+            billingEmail={auth.currentUser?.email || 'user@example.com'}
+            billingMobile="08123456789"
+            billingName={auth.currentUser?.displayName || profile?.username || 'User'}
+            ActivityIndicatorColor="#4CAF50"
+            onCancel={handlePaymentCancel}
+            onSuccess={handlePaymentSuccess}
+            autoStart={true}
+          />
+        </Modal>
+      )}
     </ScrollView>
   );
 }
@@ -147,89 +418,260 @@ export default function WalletScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0a0a0a',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0f0f23',
+    backgroundColor: '#0a0a0a',
+  },
+  header: {
+    padding: 20,
+    paddingTop: 40,
+    alignItems: 'center',
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   balanceCard: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     margin: 20,
-    padding: 30,
+    padding: 25,
     borderRadius: 20,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 15,
   },
   balanceLabel: {
-    fontSize: 18,
-    color: '#ccc',
-    marginBottom: 10,
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  balanceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  balanceEmoji: {
+    fontSize: 20,
   },
   balanceAmount: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#FFD700',
+    color: '#fff',
+    marginBottom: 8,
   },
-  section: {
-    backgroundColor: '#1a1a2e',
-    margin: 20,
+  balanceSubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 15,
+  },
+  quickActionDeposit: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
     padding: 20,
     borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  quickActionWithdraw: {
+    flex: 1,
+    backgroundColor: '#FF6B6B',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  quickActionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  quickActionEmoji: {
+    fontSize: 18,
+  },
+  quickActionText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  section: {
+    backgroundColor: '#1a1a1a',
+    margin: 20,
+    padding: 25,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  sectionHeader: {
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFD700',
-    marginBottom: 15,
+    marginBottom: 5,
   },
-  input: {
-    backgroundColor: '#16213e',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    fontSize: 16,
-    color: '#fff',
-    borderWidth: 1,
-    borderColor: '#0e4b99',
+  sectionDescription: {
+    fontSize: 14,
+    color: '#999',
+    lineHeight: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 16,
-    color: '#ccc',
+    color: '#FFD700',
     marginBottom: 10,
-    marginTop: 10,
+    fontWeight: '600',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#333',
+    paddingHorizontal: 15,
+    minHeight: 55,
+  },
+  currencySymbol: {
+    fontSize: 18,
+    color: '#FFD700',
+    fontWeight: 'bold',
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#fff',
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#333',
+    minHeight: 55,
   },
   depositButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    padding: 15,
+    backgroundColor: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+    borderRadius: 15,
+    padding: 18,
     alignItems: 'center',
+    marginBottom: 15,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  withdrawButton: {
+    backgroundColor: 'linear-gradient(135deg, #FF6B6B 0%, #ee5a52 100%)',
+    borderRadius: 15,
+    padding: 18,
+    alignItems: 'center',
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  buttonIcon: {
+    fontSize: 18,
+    marginRight: 10,
   },
   depositButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-  },
-  withdrawButton: {
-    backgroundColor: '#FF6B6B',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-    marginTop: 10,
   },
   withdrawButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  historyPlaceholder: {
-    padding: 20,
+  buttonDisabled: {
+    backgroundColor: '#555',
+    opacity: 0.6,
+  },
+  securityNote: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: 10,
+  },
+  securityText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+  },
+  historyPlaceholder: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  historyIcon: {
+    fontSize: 48,
+    marginBottom: 15,
+    opacity: 0.5,
+  },
+  historyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    marginBottom: 8,
   },
   historyText: {
-    color: '#666',
-    fontSize: 16,
-    fontStyle: 'italic',
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

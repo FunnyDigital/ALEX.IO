@@ -537,17 +537,7 @@ export default function FlappyBirdScreen({ navigation }) {
     );
   }
 
-  // Loading Screen
-  if (wallet === null) {
-    return (
-      <View style={styles.menuContainer}>
-        <View style={styles.menuCard}>
-          <Text style={styles.title}>🐦 Flappy Bird</Text>
-          <Text style={styles.subtitle}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
+
 
   // Menu Screen
   if (gameState === 'menu') {

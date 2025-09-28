@@ -108,23 +108,58 @@ router.post('/wallet/deposit', authMiddleware, async (req, res) => {
   try {
     const { reference, amount } = req.body;
     if (!reference || amount <= 0) return res.status(400).json({ message: 'Invalid request' });
+    
+    // Check if this is a demo transaction
+    if (reference.startsWith('demo_')) {
+      console.log('Processing demo deposit:', { reference, amount });
+      // Skip Paystack verification for demo transactions
+      const userRef = db.collection('users').doc(req.user);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) return res.status(404).json({ message: 'User not found' });
+      const user = userDoc.data();
+      const newWallet = (user.wallet || 0) + amount;
+      await userRef.update({ wallet: newWallet });
+      return res.json({ success: true, wallet: newWallet, message: `₦${amount} deposited successfully (DEMO)` });
+    }
+    
+    // Real Paystack verification for non-demo transactions
+    console.log('Processing real Paystack deposit:', { reference, amount });
     const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
+    if (!paystackSecret) {
+      return res.status(500).json({ message: 'Payment processor not configured' });
+    }
+    
     const verifyUrl = `https://api.paystack.co/transaction/verify/${reference}`;
+    console.log('Verifying with Paystack:', verifyUrl);
+    
     const paystackRes = await axios.get(verifyUrl, {
       headers: { Authorization: `Bearer ${paystackSecret}` }
     });
+    
+    console.log('Paystack verification response:', paystackRes.data);
     const paymentData = paystackRes.data;
-    if (paymentData.status !== true || paymentData.data.status !== 'success' || paymentData.data.amount / 100 !== amount) {
-      return res.status(400).json({ message: 'Payment not verified or amount mismatch' });
+    
+    if (paymentData.status !== true || paymentData.data.status !== 'success') {
+      console.log('Payment verification failed:', paymentData);
+      return res.status(400).json({ message: 'Payment not verified' });
     }
+    
+    if (paymentData.data.amount / 100 !== amount) {
+      console.log('Amount mismatch:', { expected: amount, received: paymentData.data.amount / 100 });
+      return res.status(400).json({ message: 'Payment amount mismatch' });
+    }
+    
     const userRef = db.collection('users').doc(req.user);
     const userDoc = await userRef.get();
     if (!userDoc.exists) return res.status(404).json({ message: 'User not found' });
     const user = userDoc.data();
     const newWallet = (user.wallet || 0) + amount;
     await userRef.update({ wallet: newWallet });
-    res.json({ wallet: newWallet });
+    
+    console.log('Real deposit successful:', { amount, newWallet });
+    res.json({ success: true, wallet: newWallet, message: `₦${amount} deposited successfully` });
   } catch (err) {
+    console.error('Deposit error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
