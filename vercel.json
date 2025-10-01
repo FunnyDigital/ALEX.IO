@@ -1,0 +1,18 @@
+{
+  "builds": [
+    {
+      "src": "mobile/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "mobile/dist" }
+    }
+  ],
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

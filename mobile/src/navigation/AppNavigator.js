@@ -61,9 +61,9 @@ export default function AppNavigator({ user }) {
         initialRouteName={user ? "Main" : "Auth"}
         screenOptions={{
           headerStyle: {
-            backgroundColor: '#4747d3ff',
+            backgroundColor: '#696972ff',
           },
-          headerTintColor: '#fff',
+          headerTintColor: '#FFD700',
           headerTitleStyle: {
             fontWeight: 'bold',
           },
