@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,15 +36,22 @@ function MainTabNavigator() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#FFD700',
-        tabBarInactiveTintColor: 'gray',
-        headerStyle: {
-          backgroundColor: '#09090aff',
-        },
-        headerTintColor: '#000000ff',
+        tabBarActiveTintColor: '#fbbf24',
+        tabBarInactiveTintColor: '#64748b',
+        headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#000000ff',
+          backgroundColor: '#0f172a',
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(255,255,255,0.05)',
+          height: Platform.OS === 'ios' ? 88 : 65,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+          paddingTop: 10,
         },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: 'bold',
+          marginBottom: Platform.OS === 'ios' ? 0 : 5,
+        }
       })}
     >
       <Tab.Screen name="Games" component={GamesScreen} />
@@ -85,22 +93,22 @@ export default function AppNavigator({ user }) {
             <Stack.Screen 
               name="CoinFlip" 
               component={CoinFlipScreen}
-              options={{ title: 'Coin Flip' }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="DiceRoll" 
               component={DiceRollScreen}
-              options={{ title: 'Dice Roll' }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="TradeGamble" 
               component={TradeGambleScreen}
-              options={{ title: 'Trade Gamble' }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="FlappyBird" 
               component={FlappyBirdScreen}
-              options={{ title: 'Flappy Bird' }}
+              options={{ headerShown: false }}
             />
           </>
         )}

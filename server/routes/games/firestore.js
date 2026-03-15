@@ -5,6 +5,7 @@ const { getFirestore, getAuth } = require('firebase-admin/firestore');
 const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // Initialize Firebase Admin SDK (ensure only once)
 if (!global._firebaseAdminInitialized) {
@@ -96,21 +97,29 @@ router.post('/coin-flip', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid input' });
     }
     
-    const result = Math.random() < 0.5 ? 'heads' : 'tails';
+    // Cryptographically secure RNG (0 or 1)
+    const randomByte = crypto.randomBytes(1)[0];
+    const result = (randomByte % 2 === 0) ? 'heads' : 'tails';
     const win = choice === result;
     console.log('Game result:', result, 'win:', win);
     
     const out = await updateWalletTxn(req.user, (current) => {
       console.log('Current wallet balance:', current);
       if (current < amount) throw new Error('Insufficient funds');
-      const payout = win ? amount : -amount; // Win: get bet back (net +amount), Lose: lose bet (net -amount)
+      
+      // Calculate payout with a 2% House Edge
+      // True probability = 50%. Fair multiplier = 2.0x. House edge multiplier = 1.96x
+      // If win, net profit = +0.96 * amount. Lose = -amount.
+      const winPayout = amount * 0.96; 
+      const payout = win ? winPayout : -amount; 
+      
       const newWallet = current + payout;
-      console.log('New wallet balance:', newWallet);
-      return { newWallet, payload: { result, win } };
+      console.log('New wallet balance:', newWallet, 'Payout:', payout);
+      return { newWallet, payload: { result, win, profit: winPayout } };
     });
     
     console.log('Transaction completed:', out);
-    res.json({ success: true, result, win, wallet: out.wallet });
+    res.json({ success: true, result, win, profit: out.profit, wallet: out.wallet });
   } catch (err) {
     console.error('Coin Flip Error:', err);
     const message = err.message === 'User not found' || err.message === 'Insufficient funds' ? err.message : 'Server error';
@@ -130,15 +139,23 @@ router.post('/dice-roll', authMiddleware, async (req, res) => {
     if (!amount || amount <= 0 || !Number.isInteger(g) || g < 1 || g > 6) {
       return res.status(400).json({ success: false, message: 'Invalid input' });
     }
-    const result = Math.floor(Math.random() * 6) + 1;
+    
+    // Cryptographically secure dice roll (1 to 6)
+    const result = crypto.randomInt(1, 7);
     const win = g === result;
-    const payout = win ? amount * 5 : -amount;
+    
+    // Calculate payout with a 2% House Edge
+    // True odds = 1/6. Fair multiplier = 6.0x. House edge multiplier = 5.88x
+    // If win, net profit = +4.88 * amount. Lose = -amount
+    const winPayout = amount * 4.88;
+    const payout = win ? winPayout : -amount;
+    
     const out = await updateWalletTxn(req.user, (current) => {
       if (current < amount) throw new Error('Insufficient funds');
       const newWallet = current + payout;
-      return { newWallet, payload: { result, win } };
+      return { newWallet, payload: { result, win, profit: winPayout } };
     });
-    res.json({ success: true, result, win, wallet: out.wallet });
+    res.json({ success: true, result, win, profit: out.profit, wallet: out.wallet });
   } catch (err) {
     console.error('Dice Roll Error:', err);
     const message = err.message === 'User not found' || err.message === 'Insufficient funds' ? err.message : 'Server error';
@@ -154,14 +171,27 @@ router.post('/trade-gamble', authMiddleware, async (req, res) => {
     if (!amount || amount <= 0 || !['up','down'].includes(direction) || ![1,2,5,10].includes(Number(duration))) {
       return res.status(400).json({ success: false, message: 'Invalid input' });
     }
-    const win = Math.random() < 0.5;
+    
+    // Simulated market movement logic using secure RNG
+    // True 50/50 for MVP representation.
+    const randomByte = crypto.randomBytes(1)[0];
+    const win = (randomByte % 2 === 0);
+    
     const out = await updateWalletTxn(req.user, (current) => {
       if (current < amount) throw new Error('Insufficient funds');
-      const payout = win ? amount : -amount; // Win: net +amount, Lose: net -amount
+      
+      // Trade Gamble (e.g. Binary Options) usually run a higher house edge, e.g., 5-10%
+      // 1.90x Multiplier (Net profit +0.90x bet)
+      const winPayout = amount * 0.90;
+      const payout = win ? winPayout : -amount; 
+
       const newWallet = current + payout;
-      return { newWallet, payload: { win } };
+      return { newWallet, payload: { win, profit: winPayout } };
     });
-    res.json({ success: true, win, wallet: out.wallet });
+    // Add realistic delay for server-side simulated "trading" duration if we wanted synchronous, 
+    // but usually clients await randomly or we resolve immediately. 
+    // We'll resolve immediately for now to keep responsive to client expectations.
+    res.json({ success: true, win, profit: out.profit, wallet: out.wallet });
   } catch (err) {
     console.error('Trade Gamble Error:', err);
     const message = err.message === 'User not found' || err.message === 'Insufficient funds' ? err.message : 'Server error';
@@ -193,9 +223,11 @@ router.post('/trade-gamble/settle', authMiddleware, async (req, res) => {
 // POST /api/games/flappy-bird
 router.post('/flappy-bird', authMiddleware, async (req, res) => {
   try {
-    const { bet, completed, timeTarget, timeSurvived } = req.body;
+    // Basic verification - this is still heavily client-trusted and prone to modification, 
+    // but in a production non-browser game, validating telemetry is necessary.
+    const { bet, completed, timeTarget, timeSurvived, telemetry } = req.body;
 
-    console.log('Flappy Bird (simplified) game data:', req.body);
+    console.log('Flappy Bird game data:', req.body);
 
     const amount = Number(bet);
     if (!amount || amount <= 0) {
@@ -206,16 +238,25 @@ router.post('/flappy-bird', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid game data' });
     }
 
-    // Simplified settlement: win => +bet, loss => -bet
+    // Basic anti-cheat: Ensure they couldn't have completed the game without surviving enough time
+    if (completed && timeSurvived < (timeTarget - 0.5)) {
+      return res.status(400).json({ success: false, message: 'Invalid game length telemetry. Suspected cheat.' });
+    }
+
     const out = await updateWalletTxn(req.user, (current) => {
       if (current < amount) throw new Error('Insufficient funds');
-      const delta = completed ? amount : -amount;
+      
+      // Since it's a skill-based game, house edge might be different, but matching the 1.96x metric
+      const winPayout = amount * 0.96;
+      const delta = completed ? winPayout : -amount;
       const newWallet = current + delta;
+      
       return {
         newWallet,
         payload: {
           win: completed,
           bet: amount,
+          profit: winPayout,
           timeSurvived,
           timeTarget
         }
@@ -229,6 +270,7 @@ router.post('/flappy-bird', authMiddleware, async (req, res) => {
       win: completed,
       wallet: out.wallet,
       bet: amount,
+      profit: out.profit,
       timeSurvived,
       timeTarget
     });

@@ -11,10 +11,13 @@ import {
   Modal,
   Platform,
   Linking,
+  SafeAreaView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { auth, db } from '../config/firebase';
 import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { apiService } from '../config/api';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Conditionally import Paystack only for mobile
 let Paystack = null;
@@ -221,392 +224,176 @@ export default function WalletScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Wallet</Text>
-        <Text style={styles.headerSubtitle}>Manage your funds</Text>
-      </View>
-
-      {/* Balance Card */}
-      <View style={styles.balanceCard}>
-        <View style={styles.balanceHeader}>
-          <Text style={styles.balanceLabel}>Available Balance</Text>
-          <View style={styles.balanceIcon}>
-            <Text style={styles.balanceEmoji}>💰</Text>
-          </View>
-        </View>
-        <Text style={styles.balanceAmount}>
-          ₦{profile?.wallet?.toLocaleString() || '0.00'}
-        </Text>
-        <Text style={styles.balanceSubtext}>
-          Ready to use • Last updated now
-        </Text>
-      </View>
-
-      {/* Deposit Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>💳 Deposit Money</Text>
-          <Text style={styles.sectionDescription}>Add funds to your wallet securely</Text>
-        </View>
-        
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Amount to Deposit</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="₦ Enter amount (Minimum ₦100)"
-            placeholderTextColor="#666"
-            value={depositAmount}
-            onChangeText={setDepositAmount}
-            keyboardType="numeric"
-          />
-        </View>
-        
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.addMoneyButton, paymentInProgress && styles.buttonDisabled]} 
-            onPress={handleDeposit}
-            disabled={paymentInProgress}
-          >
-            <View style={styles.buttonContent}>
-              <Text style={styles.buttonIcon}>💰</Text>
-              <Text style={styles.buttonText}>
-                {paymentInProgress ? 'Processing...' : 'Add Money'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.securityNote}>
-          <Text style={styles.securityText}>🔐 Secured by Paystack • Your data is encrypted</Text>
-        </View>
-      </View>
-
-      {/* Transaction History */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>📊 Recent Transactions</Text>
-          <Text style={styles.sectionDescription}>Your transaction history</Text>
-        </View>
-        <View style={styles.historyPlaceholder}>
-          <Text style={styles.historyIcon}>📝</Text>
-          <Text style={styles.historyTitle}>No transactions yet</Text>
-          <Text style={styles.historyText}>Your recent deposits will appear here</Text>
-        </View>
-      </View>
-
-      {/* Paystack Payment Modal - Mobile Only */}
-      {Platform.OS !== 'web' && Paystack && (
-        <Modal
-          visible={showPaystack}
-          animationType="slide"
-          transparent={false}
-          onRequestClose={() => setShowPaystack(false)}
+    <LinearGradient colors={['#0f172a', '#1e1b4b']} style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
         >
-          <Paystack
-            paystackKey="pk_test_019f033625483fdf933f93654941a531e6b14efc"
-            amount={depositAmount}
-            billingEmail={auth.currentUser?.email || 'user@example.com'}
-            billingMobile="08123456789"
-            billingName={auth.currentUser?.displayName || profile?.username || 'User'}
-            ActivityIndicatorColor="#4CAF50"
-            onCancel={handlePaymentCancel}
-            onSuccess={handlePaymentSuccess}
-            autoStart={true}
-          />
-        </Modal>
-      )}
-    </ScrollView>
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>MY WALLET</Text>
+              <Text style={styles.headerSubtitle}>Manage your funds</Text>
+            </View>
+
+            {/* Balance Card */}
+            <View style={styles.balanceCardWrapper}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)']}
+                style={styles.balanceCard}
+              >
+                <View style={styles.balanceHeader}>
+                  <Text style={styles.balanceLabel}>Available Balance</Text>
+                  <View style={styles.balanceIcon}>
+                    <Text style={styles.balanceEmoji}>💰</Text>
+                  </View>
+                </View>
+                <Text style={styles.balanceAmount}>
+                  ₦{profile?.wallet?.toLocaleString() || '0.00'}
+                </Text>
+                <Text style={styles.balanceSubtext}>
+                  Ready to use • Last updated now
+                </Text>
+              </LinearGradient>
+            </View>
+
+            {/* Deposit Section */}
+            <View style={styles.sectionWrapper}>
+              <LinearGradient colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)']} style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>💳 Deposit Money</Text>
+                  <Text style={styles.sectionDescription}>Add funds to your wallet securely</Text>
+                </View>
+                
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Amount to Deposit</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="₦ Enter amount (Minimum ₦100)"
+                    placeholderTextColor="#64748b"
+                    value={depositAmount}
+                    onChangeText={setDepositAmount}
+                    keyboardType="numeric"
+                  />
+                </View>
+                
+                {/* Action Buttons */}
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity 
+                    style={[styles.actionButtonWrapper, paymentInProgress && styles.buttonDisabled]} 
+                    onPress={handleDeposit}
+                    disabled={paymentInProgress}
+                  >
+                    <LinearGradient
+                      colors={paymentInProgress ? ['#475569', '#334155'] : ['#10b981', '#059669']}
+                      style={styles.actionButton}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    >
+                      <View style={styles.buttonContent}>
+                        <Text style={styles.buttonIcon}>🚀</Text>
+                        <Text style={styles.buttonText}>
+                          {paymentInProgress ? 'PROCESSING...' : 'ADD MONEY'}
+                        </Text>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.securityNote}>
+                  <Text style={styles.securityText}>🔐 Secured by Paystack • Your data is encrypted</Text>
+                </View>
+              </LinearGradient>
+            </View>
+
+            {/* Transaction History */}
+            <View style={styles.sectionWrapper}>
+              <LinearGradient colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)']} style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>📊 Recent Transactions</Text>
+                  <Text style={styles.sectionDescription}>Your transaction history</Text>
+                </View>
+                <View style={styles.historyPlaceholder}>
+                  <Text style={styles.historyIcon}>📝</Text>
+                  <Text style={styles.historyTitle}>No transactions yet</Text>
+                  <Text style={styles.historyText}>Your recent deposits will appear here</Text>
+                </View>
+              </LinearGradient>
+            </View>
+
+            {/* Paystack Payment Modal - Mobile Only */}
+            {Platform.OS !== 'web' && Paystack && (
+              <Modal
+                visible={showPaystack}
+                animationType="slide"
+                transparent={false}
+                onRequestClose={() => setShowPaystack(false)}
+              >
+                <Paystack
+                  paystackKey="pk_test_019f033625483fdf933f93654941a531e6b14efc"
+                  amount={depositAmount}
+                  billingEmail={auth.currentUser?.email || 'user@example.com'}
+                  billingMobile="08123456789"
+                  billingName={auth.currentUser?.displayName || profile?.username || 'User'}
+                  ActivityIndicatorColor="#f43f5e"
+                  onCancel={handlePaymentCancel}
+                  onSuccess={handlePaymentSuccess}
+                  autoStart={true}
+                />
+              </Modal>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0a0a0a',
-  },
-  header: {
-    padding: 20,
-    paddingTop: 40,
-    alignItems: 'center',
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  balanceCard: {
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    margin: 20,
-    padding: 25,
-    borderRadius: 20,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  balanceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  balanceLabel: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
-  },
-  balanceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  balanceEmoji: {
-    fontSize: 20,
-  },
-  balanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  balanceSubtext: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    gap: 15,
-  },
-  actionButtons: {
-    alignItems: 'center',
-    marginBottom: 20,
-    marginHorizontal: 20,
-  },
-  actionButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 15,
-    paddingVertical: 20,
-    paddingHorizontal: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-    height: 65,
-    minWidth: 200,
-  },
-  addMoneyButton: {
-    backgroundColor: '#4CAF50',
-    shadowColor: '#4CAF50',
-  },
-  addMoneyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  quickActionDeposit: {
-    flex: 1,
-    backgroundColor: '#4CAF50',
-    padding: 20,
-    borderRadius: 15,
-    alignItems: 'center',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  quickActionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  quickActionEmoji: {
-    fontSize: 18,
-  },
-  quickActionText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  section: {
-    backgroundColor: '#1a1a1a',
-    margin: 20,
-    padding: 25,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  sectionHeader: {
-    marginBottom: 20,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFD700',
-  },
-  closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#999',
-    lineHeight: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 16,
-    color: '#FFD700',
-    marginBottom: 10,
-    fontWeight: '600',
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  scrollContent: { padding: 24, paddingBottom: Platform.OS === 'ios' ? 100 : 50 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' },
+  
+  header: { alignItems: 'center', marginBottom: 24, marginTop: 24 },
+  headerTitle: { fontSize: 32, fontWeight: '900', color: '#10b981', letterSpacing: 2, marginBottom: 8, textShadowColor: 'rgba(16,185,129,0.3)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 10 },
+  headerSubtitle: { fontSize: 16, color: '#94a3b8', fontWeight: '600', letterSpacing: 1 },
+
+  balanceCardWrapper: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 10, marginBottom: 24 },
+  balanceCard: { padding: 30, borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  balanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  balanceLabel: { fontSize: 16, color: '#e2e8f0', fontWeight: 'bold', letterSpacing: 0.5 },
+  balanceIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  balanceEmoji: { fontSize: 24 },
+  balanceAmount: { fontSize: 40, fontWeight: '900', color: '#f8fafc', marginBottom: 8, letterSpacing: 1 },
+  balanceSubtext: { fontSize: 13, color: '#94a3b8', fontWeight: '600' },
+
+  sectionWrapper: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8, marginBottom: 24 },
+  section: { padding: 24, borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  sectionHeader: { marginBottom: 20 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#f8fafc', letterSpacing: 0.5, marginBottom: 4 },
+  sectionDescription: { fontSize: 13, color: '#94a3b8', lineHeight: 20 },
+
+  inputGroup: { marginBottom: 24 },
+  inputLabel: { fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginLeft: 4 },
   input: {
-    fontSize: 16,
-    color: '#fff',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#444',
-    minHeight: 60,
-    textAlign: 'left',
+    backgroundColor: 'rgba(15,23,42,0.8)', borderRadius: 16, padding: 20, fontSize: 18, color: '#f8fafc',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  depositButton: {
-    backgroundColor: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-    borderRadius: 15,
-    padding: 18,
-    alignItems: 'center',
-    marginBottom: 15,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'nowrap',
-  },
-  buttonIcon: {
-    fontSize: 16,
-    marginRight: 6,
-    lineHeight: 20,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    flex: 1,
-  },
-  depositButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  cancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#555',
-    borderRadius: 15,
-    padding: 18,
-    alignItems: 'center',
-    marginTop: 15,
-  },
-  cancelButtonText: {
-    color: '#999',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonDisabled: {
-    backgroundColor: '#555',
-    opacity: 0.6,
-  },
-  securityNote: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 10,
-  },
-  securityText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  },
-  historyPlaceholder: {
-    alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
-  },
-  historyIcon: {
-    fontSize: 48,
-    marginBottom: 15,
-    opacity: 0.5,
-  },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 8,
-  },
-  historyText: {
-    color: '#999',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+
+  actionButtons: { alignItems: 'center', width: '100%' },
+  actionButtonWrapper: { width: '100%', borderRadius: 16, shadowColor: '#10b981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  actionButton: { paddingVertical: 18, borderRadius: 16, alignItems: 'center' },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  buttonIcon: { fontSize: 20, marginRight: 8 },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+  buttonDisabled: { opacity: 0.6 },
+
+  securityNote: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 16 },
+  securityText: { fontSize: 12, color: '#64748b', textAlign: 'center', fontWeight: '600' },
+
+  historyPlaceholder: { alignItems: 'center', paddingVertical: 40, backgroundColor: 'rgba(15,23,42,0.4)', borderRadius: 20 },
+  historyIcon: { fontSize: 40, marginBottom: 16, opacity: 0.8 },
+  historyTitle: { fontSize: 16, fontWeight: 'bold', color: '#e2e8f0', marginBottom: 8, letterSpacing: 0.5 },
+  historyText: { color: '#64748b', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 });
