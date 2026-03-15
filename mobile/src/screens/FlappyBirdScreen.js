@@ -7,17 +7,18 @@ import {
   Alert,
   Dimensions,
   Animated,
-  TextInput,
   ScrollView,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import { apiService } from '../config/api';
 import { auth } from '../config/firebase';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 // Better mobile dimensions for proper centering
-const gameWidth = Platform.OS === 'web' ? 800 : Math.min(width - 40, 380);
-const gameHeight = Platform.OS === 'web' ? 600 : Math.min(height * 0.75, 650);
+const gameWidth = Platform.OS === 'web' ? 800 : width - 30;
+const gameHeight = Platform.OS === 'web' ? 600 : height * 0.65;
 const BIRD_SIZE = 35; // Slightly bigger for better visibility
 const PIPE_WIDTH = 52;
 const PIPE_GAP = 180; // Even more gap for mobile
@@ -38,7 +39,6 @@ export default function FlappyBirdScreen({ navigation }) {
   const [wallet, setWallet] = useState(null);
   // Multiplier & total winnings removed (even money payout)
   const [gameResult, setGameResult] = useState(null); // Store game result for celebration/loss screen
-  const [resultLoading, setResultLoading] = useState(false); // Track if API is updating wallet
   
   // Game Objects
   const [bird, setBird] = useState({ x: 50, y: gameHeight / 2, velocity: 0 });
@@ -309,13 +309,12 @@ export default function FlappyBirdScreen({ navigation }) {
     // Always update UI state and animation immediately
     setGameResult({
       completed,
-      winnings: completed ? parseFloat(bet) : 0,
+      winnings: completed ? parseFloat(bet) * 0.96 : 0,
       wallet: wallet || { balance: 0 },
       timeSurvived,
       targetTime,
       isDemo: bet === '0'
     });
-    setResultLoading(bet !== '0');
     setGameState(completed ? 'celebrating' : 'lost');
     if (completed) {
       Animated.sequence([
@@ -340,45 +339,29 @@ export default function FlappyBirdScreen({ navigation }) {
 
     // If demo mode, skip API call
     if (bet === '0') {
-      setResultLoading(false);
       return;
     }
 
-    // Run API call in background, update wallet and winnings if needed
+    // Run API call in background for settlement
     try {
+      console.log('Starting flappyBird API call...');
       const result = await apiService.flappyBird({
         bet: parseFloat(bet),
         completed,
         timeTarget: targetTime,
         timeSurvived
       });
-      if (result.success) {
-        // Fetch fresh wallet balance from Firestore after API call
-        try {
-          const walletResponse = await apiService.getWallet();
-          const newWallet = walletResponse.data || walletResponse;
-          setWallet(newWallet);
-          // Update gameResult with real winnings and wallet from Firestore
-          setGameResult(prev => ({
-            ...prev,
-            winnings: completed ? parseFloat(bet) : 0,
-            wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
-          }));
-        } catch (walletError) {
-          console.error('Error fetching wallet after game:', walletError);
-          // Fallback to API response wallet
-          const newWallet = result.wallet;
-          setWallet(newWallet);
-          setGameResult(prev => ({
-            ...prev,
-            winnings: completed ? parseFloat(bet) : 0,
-            wallet: newWallet && typeof newWallet.balance === 'number' ? newWallet : prev.wallet
-          }));
+      console.log('FlappyBird API result:', result);
+      
+      if (result.data?.success) {
+        console.log('Game settled successfully');
+        if (result.data.wallet) {
+          setWallet({ balance: result.data.wallet });
         }
-        setResultLoading(false);
+      } else {
+        console.error('API call failed:', result.data);
       }
     } catch (error) {
-      setResultLoading(false);
       console.error('Error ending game:', error);
     }
   };
@@ -514,18 +497,18 @@ export default function FlappyBirdScreen({ navigation }) {
   // Error Screen
   if (error) {
     return (
-      <View style={styles.menuContainer}>
-        <View style={styles.menuCard}>
-          <Text style={styles.title}>🐦 Flappy Bird</Text>
-          <Text style={[styles.subtitle, { color: 'red', marginBottom: 20 }]}>
+      <LinearGradient colors={['#0f172a', '#1e1b4b']} style={styles.menuContainer}>
+      <SafeAreaView style={styles.safeArea}>
+        <LinearGradient colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)']} style={styles.menuCard}>
+          <Text style={styles.title}>🐦 FLAPPY BIRD</Text>
+          <Text style={[styles.subtitle, { color: '#f43f5e', marginBottom: 20 }]}>
             {error}
           </Text>
           
           <TouchableOpacity 
-            style={styles.startButton} 
+            style={styles.startButtonWrapper} 
             onPress={() => {
               setError(null);
-              // Try to reload wallet
               if (auth.currentUser) {
                 apiService.getWallet()
                   .then((response) => setWallet(response.data || response))
@@ -533,84 +516,79 @@ export default function FlappyBirdScreen({ navigation }) {
               }
             }}
           >
-            <Text style={styles.startButtonText}>Try Again</Text>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.startButton} start={{x:0, y:0}} end={{x:1, y:0}}>
+              <Text style={styles.startButtonText}>TRY AGAIN</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.startButton, { backgroundColor: '#4CAF50', marginTop: 10 }]} 
+            style={styles.startButtonWrapper} 
             onPress={() => {
               setError(null);
               setWallet({ balance: 0 });
-              setBet('0'); // Set demo mode bet
+              setBet('0');
             }}
           >
-            <Text style={styles.startButtonText}>Play Demo Mode (No Betting)</Text>
+            <LinearGradient colors={['rgba(56,189,248,0.2)', 'rgba(14,165,233,0.2)']} style={[styles.startButton, { borderWidth: 1, borderColor: 'rgba(56,189,248,0.3)' }]} start={{x:0, y:0}} end={{x:1, y:0}}>
+              <Text style={[styles.startButtonText, { color: '#38bdf8' }]}>PLAY DEMO MODE</Text>
+            </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.startButton, { backgroundColor: '#666', marginTop: 10 }]} 
+            style={styles.backButtonWrapper} 
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.startButtonText}>Go Back</Text>
+            <View style={styles.backButton}>
+              <Text style={styles.backButtonText}>GO BACK</Text>
+            </View>
           </TouchableOpacity>
-        </View>
-      </View>
+        </LinearGradient>
+      </SafeAreaView>
+      </LinearGradient>
     );
   }
 
-  // Loading Screen
-  if (wallet === null) {
-    return (
-      <View style={styles.menuContainer}>
-        <View style={styles.menuCard}>
-          <Text style={styles.title}>🐦 Flappy Bird</Text>
-          <Text style={styles.subtitle}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
+
 
   // Menu Screen
   if (gameState === 'menu') {
-    console.log('Rendering menu screen'); // Debug log
     return (
-      <View style={styles.menuContainer}>
-        <View style={styles.menuCard}>
-          <Text style={styles.title}>🐦 Flappy Bird</Text>
+      <LinearGradient colors={['#0f172a', '#1e1b4b']} style={styles.menuContainer}>
+        <LinearGradient colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)']} style={styles.menuCard}>
+          <Text style={styles.title}>🐦 FLAPPY BIRD</Text>
           <Text style={styles.subtitle}>Survive the target time to win!</Text>
           
-          {/* Demo Mode Indicator */}
           {bet === '0' && (
-            <Text style={[styles.subtitle, { color: '#4CAF50', fontWeight: 'bold', marginBottom: 10 }]}>
-              🎮 DEMO MODE - No Betting
-            </Text>
+            <View style={styles.demoBadge}>
+              <Text style={styles.demoBadgeText}>🎮 DEMO MODE</Text>
+            </View>
           )}
           
-          {/* Wallet Balance */}
           {wallet !== null && (
-            <Text style={styles.balanceText}>
-              Balance: ${typeof wallet === 'object' && wallet.balance !== undefined 
-                ? wallet.balance.toFixed(2) 
-                : wallet.toFixed(2)}
-            </Text>
+            <View style={styles.balanceContainer}>
+                <Text style={styles.balanceLabel}>AVAILABLE BALANCE</Text>
+                <Text style={styles.balanceText}>
+                ₦{typeof wallet === 'object' && wallet.balance !== undefined 
+                    ? wallet.balance.toLocaleString() 
+                    : wallet.toLocaleString()}
+                </Text>
+            </View>
           )}
 
-          {/* Bet Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Bet Amount:</Text>
+            <Text style={styles.inputLabel}>BET AMOUNT (₦)</Text>
             <TextInput
               style={styles.input}
               value={bet}
               onChangeText={setBet}
-              placeholder="Enter bet amount"
+              placeholder="0.00"
               keyboardType="numeric"
-              placeholderTextColor="#666"
+              placeholderTextColor="#64748b"
             />
           </View>
 
-          {/* Time Selection */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Target Time:</Text>
+            <Text style={styles.inputLabel}>TARGET TIME</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeSelector}>
               {timeOptions.map(time => (
                 <TouchableOpacity
@@ -632,34 +610,37 @@ export default function FlappyBirdScreen({ navigation }) {
             </ScrollView>
           </View>
 
-          {/* Game Info */}
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              🎯 Survive {targetTime} seconds to win!{'\n'}
-              💰 Win = +Bet (even money){'\n'}
-              💥 Lose = -Bet (forfeit wager)
+              🎯 Survive {targetTime}s to win!{'\n'}
+              💰 Win = +96% Bet (Skill edge){'\n'}
+              💥 Lose = -Bet amount
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.startButton} onPress={startGame}>
-            <Text style={styles.startButtonText}>Start Game</Text>
+          <TouchableOpacity style={styles.startButtonWrapper} onPress={startGame}>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.startButton} start={{x:0, y:0}} end={{x:1, y:0}}>
+              <Text style={styles.startButtonText}>START GAME</Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.backButton} 
+            style={styles.backButtonWrapper} 
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>Back to Games</Text>
+             <View style={styles.backButton}>
+              <Text style={styles.backButtonText}>BACK TO GAMES</Text>
+             </View>
           </TouchableOpacity>
-        </View>
-      </View>
+        </LinearGradient>
+      </LinearGradient>
     );
   }
 
   // Celebration Screen (Win)
   if (gameState === 'celebrating' && gameResult) {
     return (
-      <View style={styles.celebrationContainer}>
+      <LinearGradient colors={['#0f172a', '#1e1b4b']} style={styles.menuContainer}>
         <Animated.View style={[
           styles.celebrationCard,
           {
@@ -685,46 +666,57 @@ export default function FlappyBirdScreen({ navigation }) {
               opacity: celebrationAnim
             }
           ]}>
-            <View style={styles.trophyWrapper}>
+            <LinearGradient colors={['rgba(251,191,36,0.2)', 'rgba(217,119,6,0.2)']} style={styles.trophyWrapper}>
               <View style={styles.trophy}>
                 <Text style={styles.trophyIcon}>🏆</Text>
               </View>
-            </View>
+            </LinearGradient>
           </Animated.View>
 
           <Text style={styles.celebrationTitle}>CONGRATULATIONS!</Text>
           <Text style={styles.celebrationSubtitle}>You're a Winner!</Text>
-          <View style={styles.resultStats}>
-            <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
+          
+          <LinearGradient colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)']} style={styles.resultStatsWrapper}>
+            <Text style={styles.statLabel}>TIME SURVIVED</Text>
+            <Text style={styles.statValue}>{gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
+            
+            <View style={styles.divider} />
+            
             {gameResult.isDemo ? (
-              <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
+              <View style={styles.demoBadge}>
+                <Text style={styles.demoBadgeText}>🎮 DEMO MODE</Text>
+              </View>
             ) : (
               <>
-                <Text style={styles.winningsText}>Winnings: ${gameResult.winnings.toFixed(2)}</Text>
-                <Text style={styles.balanceText}>New Balance: ${(wallet && typeof wallet.balance === 'number' ? wallet.balance : (typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet)).toFixed(2)}</Text>
+                <Text style={styles.statLabel}>YOU WON</Text>
+                <Text style={styles.winningsValue}>+₦{gameResult.winnings.toLocaleString()}</Text>
               </>
             )}
-          </View>
+          </LinearGradient>
           
-          <TouchableOpacity style={styles.playAgainButton} onPress={resetGame}>
-            <Text style={styles.playAgainButtonText}>Play Again</Text>
+          <TouchableOpacity style={styles.startButtonWrapper} onPress={resetGame}>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.startButton} start={{x:0, y:0}} end={{x:1, y:0}}>
+              <Text style={styles.startButtonText}>PLAY AGAIN</Text>
+            </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.menuButton} 
+            style={styles.backButtonWrapper} 
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.menuButtonText}>Back to Menu</Text>
+             <View style={styles.backButton}>
+              <Text style={styles.backButtonText}>BACK TO MENU</Text>
+             </View>
           </TouchableOpacity>
         </Animated.View>
-      </View>
+      </LinearGradient>
     );
   }
 
   // Loss Screen
   if (gameState === 'lost' && gameResult) {
     return (
-      <View style={styles.lossContainer}>
+      <LinearGradient colors={['#0f172a', '#1e1b4b']} style={styles.menuContainer}>
         <Animated.View style={[
           styles.lossCard,
           {
@@ -737,39 +729,48 @@ export default function FlappyBirdScreen({ navigation }) {
             opacity: celebrationAnim
           }
         ]}>
-          <Text style={styles.lossTitle}>💥 Game Over</Text>
+          <Text style={styles.lossTitle}>💥 GAME OVER</Text>
           <Text style={styles.lossSubtitle}>Better luck next time!</Text>
           
           {/* Loss Effect */}
           <View style={styles.lossEffectContainer}>
             <Text style={styles.lossEffect}>💔 😔 💔</Text>
-            <Text style={styles.lossEffect}>⚡ 💥 ⚡</Text>
           </View>
           
-          <View style={styles.resultStats}>
-            <Text style={styles.statText}>Time: {gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
+          <LinearGradient colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)']} style={styles.resultStatsWrapper}>
+            <Text style={styles.statLabel}>TIME SURVIVED</Text>
+            <Text style={styles.statValue}>{gameResult.timeSurvived}s / {gameResult.targetTime}s</Text>
+            
+            <View style={styles.divider} />
+            
             {gameResult.isDemo ? (
-              <Text style={styles.demoText}>🎮 DEMO MODE - No Betting</Text>
+               <View style={styles.demoBadge}>
+                <Text style={styles.demoBadgeText}>🎮 DEMO MODE</Text>
+              </View>
             ) : (
-              <>
-                <Text style={styles.lossText}>Bet Lost: ${parseFloat(bet).toFixed(2)}</Text>
-                <Text style={styles.balanceText}>New Balance: ${(typeof gameResult.wallet === 'object' ? gameResult.wallet.balance : gameResult.wallet).toFixed(2)}</Text>
+               <>
+                <Text style={styles.statLabel}>YOU LOST</Text>
+                <Text style={styles.lossValue}>-₦{parseFloat(bet).toLocaleString()}</Text>
               </>
             )}
-          </View>
+          </LinearGradient>
           
-          <TouchableOpacity style={styles.playAgainButton} onPress={resetGame}>
-            <Text style={styles.playAgainButtonText}>Try Again</Text>
+          <TouchableOpacity style={styles.startButtonWrapper} onPress={resetGame}>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.startButton} start={{x:0, y:0}} end={{x:1, y:0}}>
+              <Text style={styles.startButtonText}>TRY AGAIN</Text>
+            </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.menuButton} 
+            style={styles.backButtonWrapper} 
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.menuButtonText}>Back to Menu</Text>
+             <View style={styles.backButton}>
+              <Text style={styles.backButtonText}>BACK TO MENU</Text>
+             </View>
           </TouchableOpacity>
         </Animated.View>
-      </View>
+      </LinearGradient>
     );
   }
 
@@ -908,641 +909,93 @@ export default function FlappyBirdScreen({ navigation }) {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#87CEEB', // Sky blue background
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  menuContainer: {
-    flex: 1,
-    backgroundColor: '#2c3e50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  card: {
-    backgroundColor: '#1a1a2e',
-    padding: 30,
-    borderRadius: 20,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  emoji: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#FFD700',
-    textAlign: 'center',
-    marginBottom: 20,
-    fontWeight: '600',
-  },
-  description: {
-    fontSize: 16,
-    color: '#ccc',
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 24,
-  },
-  button: {
-    backgroundColor: '#666',
-    borderRadius: 10,
-    padding: 15,
-    width: '100%',
-    marginBottom: 15,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  backButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#FFD700',
-    borderRadius: 10,
-    padding: 15,
-    width: '100%',
-  },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  gameContainer: {
-    width: gameWidth,
-    height: gameHeight,
-    backgroundColor: '#87CEEB',
-    position: 'relative',
-    alignSelf: 'center',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  ground: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-    backgroundColor: '#8B4513',
-    borderTopWidth: 3,
-    borderTopColor: '#654321',
-    zIndex: 10,
-  },
-  webGameWrapper: {
-    flex: 1,
-    backgroundColor: '#2c3e50',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  webGameContainer: {
-    width: 800,
-    height: 600,
-    borderRadius: 15,
-    overflow: 'hidden',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-    border: '3px solid #34495e',
-  },
-  background: {
-    position: 'absolute',
-    top: 0,
-    height: '100%',
-    alignItems: 'center',
-  },
-  skyLayer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '70%',
-    backgroundColor: 'linear-gradient(to bottom, #87CEEB, #E0F6FF)',
-  },
-  cloudsContainer: {
-    position: 'absolute',
-    top: 20,
-    width: '100%',
-    height: 100,
-  },
-  bigClouds: {
-    position: 'absolute',
-    fontSize: 40,
-    opacity: 0.8,
-    top: 0,
-  },
-  buildingsContainer: {
-    position: 'absolute',
-    bottom: 120,
-    width: '100%',
-    height: 150,
-  },
-  building: {
-    position: 'absolute',
-    width: 25,
-    bottom: 0,
-    borderRadius: 2,
-    opacity: 0.6,
-  },
-  treesContainer: {
-    position: 'absolute',
-    bottom: 100,
-    width: '100%',
-    height: 50,
-  },
-  tree: {
-    position: 'absolute',
-    fontSize: 30,
-    bottom: 0,
-  },
-  bird: {
-    position: 'absolute',
-    width: BIRD_SIZE,
-    height: BIRD_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  fishBody: {
-    position: 'relative',
-    width: BIRD_SIZE,
-    height: BIRD_SIZE,
-  },
-  fishMain: {
-    position: 'absolute',
-    width: BIRD_SIZE * 0.8,
-    height: BIRD_SIZE * 0.6,
-    backgroundColor: '#4A90E2',
-    borderRadius: BIRD_SIZE * 0.3,
-    top: BIRD_SIZE * 0.2,
-    left: BIRD_SIZE * 0.1,
-    borderWidth: 2,
-    borderColor: '#2E5C8A',
-  },
-  fishFin: {
-    position: 'absolute',
-    width: BIRD_SIZE * 0.3,
-    height: BIRD_SIZE * 0.4,
-    backgroundColor: '#6A5ACD',
-    borderRadius: BIRD_SIZE * 0.15,
-    top: BIRD_SIZE * 0.1,
-    left: BIRD_SIZE * 0.05,
-    transform: [{ rotate: '30deg' }],
-  },
-  fishWing: {
-    position: 'absolute',
-    width: BIRD_SIZE * 0.4,
-    height: BIRD_SIZE * 0.3,
-    backgroundColor: '#8A2BE2',
-    borderRadius: BIRD_SIZE * 0.15,
-    top: BIRD_SIZE * 0.3,
-    right: BIRD_SIZE * 0.05,
-    transform: [{ rotate: '-20deg' }],
-  },
-  fishEye: {
-    position: 'absolute',
-    width: BIRD_SIZE * 0.15,
-    height: BIRD_SIZE * 0.15,
-    backgroundColor: 'white',
-    borderRadius: BIRD_SIZE * 0.075,
-    top: BIRD_SIZE * 0.25,
-    left: BIRD_SIZE * 0.5,
-    borderWidth: 1,
-    borderColor: '#000',
-  },
-  fishTail: {
-    position: 'absolute',
-    width: BIRD_SIZE * 0.25,
-    height: BIRD_SIZE * 0.4,
-    backgroundColor: '#6A5ACD',
-    borderRadius: BIRD_SIZE * 0.1,
-    top: BIRD_SIZE * 0.3,
-    left: -BIRD_SIZE * 0.1,
-    transform: [{ rotate: '45deg' }],
-  },
-  pipe: {
-    position: 'absolute',
-    width: PIPE_WIDTH,
-    backgroundColor: '#22c55e', // Brighter green for better visibility
-    borderRadius: 5,
-    borderWidth: 3, // Thicker border for better visibility
-    borderColor: '#16a34a', // Darker green border for contrast
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5, // Android shadow
-  },
-  hud: {
-    position: 'absolute',
-    top: 35, // Moved down to avoid ceiling
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 200,
-  },
-  hudText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  winningsText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  instructionsContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 200,
-  },
-  countdownContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    zIndex: 500,
-  },
-  countdownText: {
-    fontSize: 80,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 3, height: 3 },
-    textShadowRadius: 5,
-    marginBottom: 10,
-  },
-  countdownSubtext: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 3,
-  },
-  instructionsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  gameOverModal: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 300,
-  },
-  gameOverCard: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 30,
-    margin: 20,
-    alignItems: 'center',
-    minWidth: 280,
-  },
-  gameOverTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF6B6B',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  gameOverStats: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 25,
-  },
-  playAgainButton: {
-    backgroundColor: '#8E24AA',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    marginBottom: 12,
-    width: '80%',
-    maxWidth: 200,
-    shadowColor: '#6A1B9A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    borderWidth: 2,
-    borderColor: '#9C27B0',
-    alignItems: 'center',
-  },
-  playAgainButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  menuButton: {
-    backgroundColor: 'rgba(158, 158, 158, 0.2)',
-    paddingVertical: 10,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    width: '80%',
-    maxWidth: 200,
-    borderWidth: 2,
-    borderColor: 'rgba(117, 117, 117, 0.4)',
-    alignItems: 'center',
-  },
-  menuButtonText: {
-    color: '#757575',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  menuCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 15,
-    padding: 20,
-    width: '100%',
-    maxWidth: 350,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  balanceText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2E8B57',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    width: '100%',
-    marginBottom: 15,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 5,
-  },
-  input: {
-    borderWidth: 2,
-    borderColor: '#2E8B57',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: 'white',
-    textAlign: 'center',
-  },
-  picker: {
-    borderWidth: 2,
-    borderColor: '#2E8B57',
-    borderRadius: 8,
-    backgroundColor: 'white',
-  },
-  infoBox: {
-    backgroundColor: '#F0F8FF',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2E8B57',
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-  },
-  startButton: {
-    backgroundColor: '#2E8B57',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-    marginBottom: 10,
-    minWidth: 200,
-  },
-  startButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  timeSelector: {
-    maxHeight: 50,
-  },
-  timeButton: {
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#2E8B57',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginRight: 10,
-    minWidth: 50,
-    alignItems: 'center',
-  },
-  timeButtonSelected: {
-    backgroundColor: '#2E8B57',
-  },
-  timeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2E8B57',
-  },
-  timeButtonTextSelected: {
-    color: 'white',
-  },
+  container: { flex: 1, backgroundColor: '#0f172a' },
+  safeArea: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  gameContainer: { width: gameWidth, height: gameHeight, backgroundColor: '#87CEEB', position: 'relative', alignSelf: 'center', borderRadius: 10, overflow: 'hidden' },
+  ground: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 100, backgroundColor: '#8B4513', borderTopWidth: 3, borderTopColor: '#654321', zIndex: 10 },
+  webGameWrapper: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  webGameContainer: { width: 800, height: 600, borderRadius: 15, overflow: 'hidden', border: '3px solid #334155' },
   
-  // Celebration Screen Styles
-  celebrationContainer: {
-    flex: 1,
-    backgroundColor: '#6A1B9A', // Purple gradient base
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  celebrationCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 25,
-    paddingVertical: 30,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    width: '90%',
-    maxWidth: 350,
-    minHeight: 400,
-    shadowColor: '#4A148C',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 20,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
-    justifyContent: 'space-around',
-  },
-  trophyContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  trophyWrapper: {
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    borderRadius: 50,
-    padding: 20,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 215, 0, 0.4)',
-  },
-  trophy: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trophyIcon: {
-    fontSize: 60,
-    color: '#FFD700',
-    textShadowColor: '#FFA000',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-  celebrationTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#6A1B9A',
-    textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: 'rgba(106, 27, 154, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-    letterSpacing: 1,
-    flexShrink: 1,
-  },
-  celebrationSubtitle: {
-    fontSize: 16,
-    color: '#8E24AA',
-    textAlign: 'center',
-    marginBottom: 20,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  confettiContainer: {
-    alignItems: 'center',
-    marginBottom: 25,
-  },
-  confetti: {
-    fontSize: 20,
-    textAlign: 'center',
-    marginVertical: 3,
-    opacity: 0.9,
-    textShadowColor: 'rgba(255, 215, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
+  menuContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  menuCard: { padding: 30, borderRadius: 32, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 10, width: '100%', maxWidth: 380 },
+  title: { fontSize: 32, fontWeight: '900', color: '#10b981', marginBottom: 8, letterSpacing: 2, textShadowColor: 'rgba(16,185,129,0.3)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 10 },
+  subtitle: { fontSize: 16, color: '#94a3b8', fontWeight: '600', letterSpacing: 1, marginBottom: 24, textAlign: 'center' },
   
-  // Loss Screen Styles
-  lossContainer: {
-    flex: 1,
-    backgroundColor: '#f44336',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  lossCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 30,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 350,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  lossTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#f44336',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  lossSubtitle: {
-    fontSize: 18,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  lossEffectContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  lossEffect: {
-    fontSize: 24,
-    textAlign: 'center',
-    marginVertical: 2,
-  },
+  demoBadge: { backgroundColor: 'rgba(56,189,248,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(56,189,248,0.3)', marginBottom: 20 },
+  demoBadgeText: { color: '#38bdf8', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   
-  // Shared result styles
-  resultStats: {
-    alignItems: 'center',
-    marginVertical: 15,
-    paddingHorizontal: 10,
-    width: '100%',
-  },
-  statText: {
-    fontSize: 14,
-    color: '#333',
-    marginVertical: 3,
-    textAlign: 'center',
-    flexWrap: 'wrap',
-  },
-  winningsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginVertical: 2,
-  },
-  lossText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#f44336',
-    marginVertical: 2,
-  },
-  demoText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginVertical: 2,
-  },
+  balanceContainer: { alignItems: 'center', marginBottom: 24, backgroundColor: 'rgba(15,23,42,0.6)', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', width: '100%' },
+  balanceLabel: { fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  balanceText: { fontSize: 24, fontWeight: '900', color: '#f8fafc', letterSpacing: 1 },
+  
+  inputContainer: { width: '100%', marginBottom: 20 },
+  inputLabel: { fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginLeft: 4 },
+  input: { backgroundColor: 'rgba(15,23,42,0.8)', borderRadius: 16, padding: 16, fontSize: 16, color: '#f8fafc', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  
+  timeSelector: { maxHeight: 55, marginTop: 4 },
+  timeButton: { backgroundColor: 'rgba(15,23,42,0.8)', borderRadius: 16, paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 48 },
+  timeButtonSelected: { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: '#10b981' },
+  timeButtonText: { fontSize: 16, fontWeight: '600', color: '#94a3b8' },
+  timeButtonTextSelected: { color: '#10b981', fontWeight: 'bold' },
+  
+  infoBox: { backgroundColor: 'rgba(15,23,42,0.6)', padding: 16, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', width: '100%' },
+  infoText: { fontSize: 13, color: '#94a3b8', lineHeight: 22 },
+  
+  startButtonWrapper: { width: '100%', marginBottom: 16, borderRadius: 16, shadowColor: '#10b981', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  startButton: { paddingVertical: 18, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  startButtonText: { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+  
+  backButtonWrapper: { width: '100%' },
+  backButton: { paddingVertical: 18, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  backButtonText: { color: '#f8fafc', fontSize: 14, fontWeight: 'bold', letterSpacing: 1 },
+
+  celebrationCard: { padding: 30, borderRadius: 32, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)', shadowColor: '#f59e0b', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10, width: '100%', maxWidth: 380, backgroundColor: 'rgba(15,23,42,0.8)' },
+  trophyContainer: { alignItems: 'center', marginBottom: 24 },
+  trophyWrapper: { width: 100, height: 100, borderRadius: 50, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(251,191,36,0.4)', shadowColor: '#f59e0b', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10 },
+  trophy: { justifyContent: 'center', alignItems: 'center' },
+  trophyIcon: { fontSize: 48, shadowColor: '#f59e0b', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.5, shadowRadius: 5 },
+  celebrationTitle: { fontSize: 24, fontWeight: '900', color: '#f8fafc', marginBottom: 4, letterSpacing: 1, textAlign: 'center' },
+  celebrationSubtitle: { fontSize: 16, color: '#fbbf24', textAlign: 'center', marginBottom: 24, fontWeight: 'bold' },
+  
+  lossCard: { padding: 30, borderRadius: 32, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(244,63,94,0.3)', shadowColor: '#e11d48', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10, width: '100%', maxWidth: 380, backgroundColor: 'rgba(15,23,42,0.8)' },
+  lossTitle: { fontSize: 24, fontWeight: '900', color: '#f8fafc', marginBottom: 4, letterSpacing: 1, textAlign: 'center' },
+  lossSubtitle: { fontSize: 16, color: '#f43f5e', textAlign: 'center', marginBottom: 24, fontWeight: 'bold' },
+  lossEffectContainer: { alignItems: 'center', marginBottom: 24 },
+  lossEffect: { fontSize: 32, marginVertical: 4 },
+
+  resultStatsWrapper: { width: '100%', backgroundColor: 'rgba(15,23,42,0.6)', padding: 20, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 24, alignItems: 'center' },
+  statLabel: { fontSize: 11, color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  statValue: { fontSize: 18, color: '#f8fafc', fontWeight: '900' },
+  divider: { height: 1, width: '100%', backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 16 },
+  winningsValue: { fontSize: 24, color: '#10b981', fontWeight: '900' },
+  lossValue: { fontSize: 24, color: '#f43f5e', fontWeight: '900' },
+
+  background: { position: 'absolute', top: 0, height: '100%', alignItems: 'center' },
+  skyLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: '70%', backgroundColor: 'linear-gradient(to bottom, #87CEEB, #E0F6FF)' },
+  cloudsContainer: { position: 'absolute', top: 20, width: '100%', height: 100 },
+  bigClouds: { position: 'absolute', fontSize: 40, opacity: 0.8, top: 0 },
+  buildingsContainer: { position: 'absolute', bottom: 120, width: '100%', height: 150 },
+  building: { position: 'absolute', width: 25, bottom: 0, borderRadius: 2, opacity: 0.6 },
+  treesContainer: { position: 'absolute', bottom: 100, width: '100%', height: 50 },
+  tree: { position: 'absolute', fontSize: 30, bottom: 0 },
+
+  bird: { position: 'absolute', width: 35, height: 35, justifyContent: 'center', alignItems: 'center', zIndex: 100 },
+  fishBody: { position: 'relative', width: 35, height: 35 },
+  fishMain: { position: 'absolute', width: 28, height: 21, backgroundColor: '#4A90E2', borderRadius: 10, top: 7, left: 3, borderWidth: 2, borderColor: '#2E5C8A' },
+  fishFin: { position: 'absolute', width: 10, height: 14, backgroundColor: '#6A5ACD', borderRadius: 5, top: 3, left: 2, transform: [{ rotate: '30deg' }] },
+  fishWing: { position: 'absolute', width: 14, height: 10, backgroundColor: '#8A2BE2', borderRadius: 5, top: 10, right: 2, transform: [{ rotate: '-20deg' }] },
+  fishEye: { position: 'absolute', width: 5, height: 5, backgroundColor: 'white', borderRadius: 3, top: 9, left: 17, borderWidth: 1, borderColor: '#000' },
+  fishTail: { position: 'absolute', width: 9, height: 14, backgroundColor: '#6A5ACD', borderRadius: 4, top: 10, left: -3, transform: [{ rotate: '45deg' }] },
+  
+  pipe: { position: 'absolute', width: 52, backgroundColor: '#22c55e', borderRadius: 5, borderWidth: 3, borderColor: '#16a34a', shadowColor: '#000', shadowOffset: { width: 2, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 5 },
+  
+  hud: { position: 'absolute', top: 35, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', zIndex: 200 },
+  hudText: { fontSize: 16, fontWeight: 'bold', color: 'white', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 },
+  
+  instructionsContainer: { position: 'absolute', bottom: 100, left: 0, right: 0, alignItems: 'center', zIndex: 200 },
+  instructionsText: { fontSize: 18, fontWeight: 'bold', color: 'white', textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 },
+  
+  countdownContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.3)', zIndex: 500 },
+  countdownText: { fontSize: 80, fontWeight: 'bold', color: '#fbbf24', textShadowColor: '#000', textShadowOffset: { width: 3, height: 3 }, textShadowRadius: 5, marginBottom: 10 },
+  countdownSubtext: { fontSize: 24, fontWeight: 'bold', color: 'white', textShadowColor: '#000', textShadowOffset: { width: 2, height: 2 }, textShadowRadius: 3 },
 });
