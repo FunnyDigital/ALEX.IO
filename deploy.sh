@@ -1,106 +1,26 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Build the ALEX.IO web app and optionally deploy it.
+set -euo pipefail
+cd "$(dirname "$0")"
 
-echo "🚀 Multi-Platform Deployment Script for ALEX.IO"
-echo "================================================"
+echo "Installing dependencies..."
+npm --prefix web install --include=dev
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+echo "Building web app..."
+npm --prefix web run build
 
-# Function to print colored output
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+echo ""
+echo "Build complete: web/dist"
+echo "Deploy options:"
+echo "  1. Vercel   -> vercel --prod"
+echo "  2. Netlify  -> netlify deploy --prod --dir=web/dist"
+echo "  3. Firebase -> firebase deploy --only hosting"
+echo "  4. Skip deploy"
+read -r -p "Choose an option (1-4): " choice
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Navigate to mobile directory
-cd mobile || exit 1
-
-print_status "Installing dependencies..."
-npm install
-
-print_status "Building for all platforms..."
-npm run build:all
-
-if [ $? -eq 0 ]; then
-    print_success "Build completed successfully!"
-else
-    print_error "Build failed!"
-    exit 1
-fi
-
-# Go back to root directory
-cd ..
-
-print_status "Available deployment options:"
-echo "1. Web (Vercel)"
-echo "2. Web (Netlify)"
-echo "3. Android (EAS Build)"
-echo "4. iOS (EAS Build)"
-echo "5. All platforms"
-
-read -p "Choose deployment option (1-5): " choice
-
-case $choice in
-    1)
-        print_status "Deploying to Vercel..."
-        vercel --prod
-        ;;
-    2)
-        print_status "Deploying to Netlify..."
-        if command -v netlify &> /dev/null; then
-            netlify deploy --prod --dir=mobile/dist
-        else
-            print_warning "Netlify CLI not installed. Installing..."
-            npm install -g netlify-cli
-            netlify deploy --prod --dir=mobile/dist
-        fi
-        ;;
-    3)
-        print_status "Building Android app with EAS..."
-        cd mobile
-        npx eas build --platform android --profile production
-        ;;
-    4)
-        print_status "Building iOS app with EAS..."
-        cd mobile
-        npx eas build --platform ios --profile production
-        ;;
-    5)
-        print_status "Deploying to all platforms..."
-        # Web deployment
-        print_status "1/3 Deploying to Vercel..."
-        vercel --prod
-        
-        # Mobile builds
-        cd mobile
-        print_status "2/3 Building Android app..."
-        npx eas build --platform android --profile production --non-interactive &
-        
-        print_status "3/3 Building iOS app..."
-        npx eas build --platform ios --profile production --non-interactive &
-        
-        wait
-        print_success "All deployments initiated!"
-        ;;
-    *)
-        print_error "Invalid option selected!"
-        exit 1
-        ;;
+case "$choice" in
+  1) npx vercel --prod ;;
+  2) npx netlify-cli deploy --prod --dir=web/dist ;;
+  3) npx firebase-tools deploy --only hosting ;;
+  *) echo "Skipping deploy." ;;
 esac
-
-print_success "Deployment process completed!"

@@ -1,0 +1,1 @@
+# Keeps the demo datastore directory in git; db.json itself is gitignored.

@@ -1,33 +1,13 @@
+const config = require('./src/config');
+const createApp = require('./src/app');
 
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+const app = createApp();
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-
-// MongoDB removed. All data now uses Firestore/Firebase.
-
-// Basic route
-app.get('/', (req, res) => {
-  res.send('API is running');
-});
-
-// Authentication routes - temporarily commented out due to mongoose dependency
-// app.use('/api/auth', require('./routes/auth'));
-
-// User profile and wallet routes (Firestore)
-app.use('/api/user', require('./routes/user_firestore'));
-
-// Basic games routes
-
-// Advanced games routes
-// Firestore-based games routes
-app.use('/api/games', require('./routes/games/firestore'));
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Server running on http://127.0.0.1:${PORT}`);
+app.listen(config.port, config.host, () => {
+  const modeLabel = config.isDemo ? 'DEMO' : 'FIREBASE';
+  console.log(`[ALEX.IO] ${modeLabel} mode`);
+  console.log(`[ALEX.IO] API listening on http://localhost:${config.port}`);
+  if (config.isDemo) {
+    console.log('[ALEX.IO] Running without Firebase. Data is stored in server/data/db.json.');
+  }
 });

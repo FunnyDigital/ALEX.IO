@@ -1,190 +1,124 @@
-# Alex.IO Gaming Platform
+# ALEX.IO
 
-A full-stack gaming platform with both web and mobile applications, featuring cryptocurrency-style games with Firebase backend.
+A modern, responsive **gaming web app** (installable PWA) with a Node/Express API.
+Plays like a native app on desktop and Android — no app store required.
 
-## Project Structure
-
-This project contains multiple applications:
-
-- **`client/`** - React.js web application (original)
-- **`mobile/`** - React Native mobile app (Expo)
-- **`server/`** - Node.js/Express backend API
-- **`functions/`** - Firebase Cloud Functions
+![stack](https://img.shields.io/badge/stack-React%20%2B%20Vite%20%2B%20Tailwind-10b981)
+![api](https://img.shields.io/badge/api-Express%20%2B%20Firebase-0b1220)
 
 ## Features
 
-### Core Features
-- 🔐 **Firebase Authentication** - Secure user registration/login
-- 💰 **Digital Wallet** - Deposit/withdraw with Paystack integration
-- 🎮 **Gaming Suite**:
-  - Coin Flip - Classic heads/tails betting
-  - Dice Roll - Number prediction with 5x multiplier
-  - Trade Gamble - Cryptocurrency price prediction (coming soon)
-  - Flappy Bird - Skill-based rewards (coming soon)
-- 📱 **Cross-Platform** - Web and mobile support
-- 👤 **User Profiles** - Game statistics and account management
+- **Four games** — Coin Flip, Dice Roll, Trade Gamble and Flappy Flight, all server-settled.
+- **Wallet** — deposits, withdrawals, bank payouts, and a full transaction history.
+- **Profile** — personal details, bank details, and play statistics.
+- **Installable PWA** — add to your home screen / desktop and run full-screen, offline-capable shell.
+- **Light & responsive** — mobile-first layout with a bottom tab bar on phones and a side nav on desktop.
+- **Runs with zero configuration** — local demo mode needs no API keys. Optionally connect Firebase.
 
-### Technical Stack
+## Project structure
 
-**Frontend (Web)**:
-- React 18 with Material-UI
-- React Router for navigation
-- Tailwind CSS for styling
-- Firebase SDK for authentication
-
-**Mobile App**:
-- React Native with Expo
-- React Navigation
-- React Native StyleSheet
-- Native animations and components
-
-**Backend**:
-- Node.js with Express
-- Firebase Admin SDK
-- Firestore database
-- RESTful API design
-
-## Getting Started
-
-### Prerequisites
-- Node.js 16+ 
-- Firebase project with Firestore enabled
-- Expo CLI (for mobile development)
-
-### 1. Firebase Setup
-1. Create a Firebase project at https://console.firebase.google.com
-2. Enable Authentication and Firestore
-3. Update Firebase configuration in both `client/src/firebase.js` and `mobile/src/config/firebase.js`
-
-### 2. Backend Setup
-```bash
-cd server
-npm install
-# Update .env with your Firebase admin credentials
-npm start
+```
+alex-io/
+├─ web/        # Vite + React + TypeScript + Tailwind PWA (the app)
+├─ server/     # Express API — demo (JSON) or Firebase backend, plus game logic
+├─ package.json# root scripts (dev / build / start)
+└─ firebase.json, vercel.json, netlify.toml
 ```
 
-### 3. Web App Setup
+## Quick start (local demo mode)
+
+Requires Node.js 20+.
+
 ```bash
-cd client
-npm install
-npm start
+npm run install:all     # install server + web dependencies
+npm run build           # build the web app into web/dist
+npm start               # serve the API + built app on http://localhost:5000
 ```
 
-### 4. Mobile App Setup
+Open **http://localhost:5000**. Sign up with any email and a 6+ character password — you start with
+₦1,000. No Firebase, no API keys, no internet required.
+
+> Data is stored locally in `server/data/db.json`. Delete that file to reset everything.
+
+## Development mode (hot reload)
+
 ```bash
-cd mobile
-npm install
-# For web preview
-npx expo start --web
-# For mobile device (install Expo Go app)
-npx expo start
+npm run dev
 ```
 
-## API Endpoints
+- Web app with hot reload: **http://localhost:5173** (proxies `/api` to the server)
+- API: **http://localhost:5000**
 
-### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
+## Configuration
 
-### Games
-- `POST /api/games/coinflip` - Play coin flip game
-- `POST /api/games/dice-roll` - Play dice roll game
+Both modes read `.env` files (see `server/.env.example` and `web/.env.example`).
 
-### User Management  
-- `GET /api/user/profile` - Get user profile
-- `PUT /api/user/profile` - Update user profile
-- `POST /api/user/deposit` - Deposit funds
-- `POST /api/user/withdraw` - Withdraw funds
+### Backend (`server/.env`)
 
-## Mobile App Conversion
+| Variable | Purpose |
+| --- | --- |
+| `DEMO_MODE` | `auto` (default), `demo`, or `firebase` |
+| `PORT` / `HOST` | API port and bind address (default `5000` / `0.0.0.0`) |
+| `JWT_SECRET` | Signs demo-mode session tokens |
+| `CORS_ORIGINS` | Comma-separated allowed origins (default: all) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to a Firebase service-account JSON |
+| `FIREBASE_PRIVATE_KEY` / `FIREBASE_CLIENT_EMAIL` | Service-account fields as env vars |
+| `PAYSTACK_SECRET_KEY` | Enables real Paystack deposits/payouts |
 
-The React Native mobile app was converted from the original React web app with the following changes:
+`DEMO_MODE=auto` uses Firebase when credentials are found, otherwise the local JSON store.
 
-### Navigation
-- **Web**: React Router → **Mobile**: React Navigation
-- Stack navigator for game screens
-- Tab navigator for main sections
+### Frontend (`web/.env.local`)
 
-### Styling
-- **Web**: Tailwind CSS → **Mobile**: React Native StyleSheet
-- Responsive design adapted for mobile screens
-- Native animations using Animated API
+| Variable | Purpose |
+| --- | --- |
+| `VITE_API_URL` | API base URL — leave unset for same-origin `/api` |
+| `VITE_PAYSTACK_PUBLIC_KEY` | Enables card deposits (otherwise instant demo deposits) |
+| `VITE_FIREBASE_*` | Firebase web config to enable Firebase auth |
 
-### Components
-- **Web**: HTML/CSS → **Mobile**: React Native components
-- Touch-friendly interfaces
-- Platform-specific optimizations
+## Install as an app (PWA)
 
-### State Management
-- Same Firebase integration
-- AsyncStorage for offline persistence
-- Centralized API service with axios
+Once deployed (or running locally), open the site and use your browser's **Install** / **Add to
+Home Screen** action. The app ships a web manifest and service worker, so it launches full-screen
+with its own icon.
+
+## API reference
+
+All routes under `/api`. Authenticated routes expect `Authorization: Bearer <token>`.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Health + current mode |
+| `POST` | `/auth/register` · `/auth/login` | Demo-mode auth (Firebase mode uses the SDK) |
+| `GET` | `/user/profile` · `PUT /user/profile` | Read / update profile |
+| `GET` | `/user/wallet` | Balance |
+| `POST` | `/user/wallet/deposit` · `/withdraw` · `/payout` | Wallet operations |
+| `GET` | `/user/transactions` | Transaction history |
+| `POST` | `/games/coin-flip` · `/dice-roll` · `/trade-gamble` · `/flappy-bird` | Play a game |
+
+Game outcomes are server-settled with a cryptographically secure RNG.
 
 ## Deployment
 
-### Web App
-- Build: `cd client && npm run build`
-- Deploy to Netlify, Vercel, or Firebase Hosting
+The build output is a static bundle in `web/dist`. Deploy it to any static host:
 
-### Mobile App
-- **Development**: Expo Go app
-- **Production**: `expo build` for app stores
-- **Web**: `expo build:web` for web deployment
+- **Firebase Hosting** — `firebase deploy --only hosting` (free tier, custom domain)
+- **Vercel** — `npx vercel --prod`
+- **Netlify** — `npx netlify-cli deploy --prod --dir=web/dist`
 
-### Backend
-- Deploy to Railway, Heroku, or Firebase Functions
-- Update CORS settings for production domains
+Or run `./deploy.ps1` / `./deploy.sh` for a guided flow. The API itself is a standard Node service —
+deploy `server/` to any Node host and point `VITE_API_URL` at it.
 
-## Environment Variables
+## Security note
 
-### Server (.env)
-```
-FIREBASE_ADMIN_KEY=your_firebase_admin_key
-PORT=5000
-```
+The previous version committed secrets in `server/.env` (a Paystack secret key and JWT secret) and
+hardcoded a Firebase config. Those values are now environment-driven and `.env` is git-ignored.
+**Rotate any keys that were previously committed.**
 
-### Client (.env)
-```
-REACT_APP_API_URL=http://localhost:5000
-```
+## Scripts
 
-### Mobile (.env)
-```
-API_BASE_URL=http://localhost:5000
-```
-
-## Game Rules
-
-### Coin Flip
-- Choose heads or tails
-- Win: 1:1 payout ratio
-- Lose: Forfeit bet amount
-
-### Dice Roll  
-- Guess number 1-6
-- Win: 5:1 payout ratio
-- Lose: Forfeit bet amount
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Support
-
-For issues and questions:
-- Create GitHub issue
-- Check documentation in individual app folders
-- Review API documentation
-
----
-
-**Made with ❤️ for the gaming community**
+| Command | Description |
+| --- | --- |
+| `npm run install:all` | Install server + web dependencies |
+| `npm run dev` | Run API and web dev servers together |
+| `npm run build` | Build the web app |
+| `npm start` | Serve API + built web app on one port |

@@ -1,18 +1,6 @@
 {
-  "builds": [
-    {
-      "src": "mobile/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "mobile/dist" }
-    }
-  ],
-  "routes": [
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm --prefix web install --include=dev && npm --prefix web run build",
+  "outputDirectory": "web/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
