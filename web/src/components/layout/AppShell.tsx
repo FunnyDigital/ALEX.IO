@@ -10,16 +10,16 @@ export function AppShell() {
   const { balance } = useWallet();
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
+    <div className="h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
       <DesktopNav balance={balance} />
-      <div className="flex min-h-dvh flex-col">
-        <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/80 backdrop-blur lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex h-dvh flex-col overflow-hidden">
+        <header className="shrink-0 border-b border-ink-100 bg-white/80 backdrop-blur lg:hidden">
+          <div className="flex items-center justify-between px-4 py-2.5">
             <Logo />
             <BalanceBadge balance={balance} />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-5 lg:px-8 lg:pb-12 lg:pt-8">
+        <main className="no-scrollbar mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3 lg:px-8 lg:pb-6 lg:pt-6">
           <Outlet />
         </main>
         <MobileTabBar />

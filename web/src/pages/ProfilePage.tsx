@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { CreditCard, LogOut, Pencil, Save, Trophy, User, Wallet, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { InstallPrompt } from '../components/layout/InstallPrompt';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
@@ -68,33 +69,39 @@ export function ProfilePage() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-5"
+      className="flex min-h-0 flex-1 flex-col gap-2"
     >
-      <Card className="flex items-center gap-4 p-5">
-        <span className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-xl font-black text-white">
+      <Card className="flex shrink-0 items-center gap-3 p-3.5">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-lg font-black text-white">
           {initials}
         </span>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-black text-ink-900">
-            {user?.username || 'Player'}
-          </h1>
-          <p className="truncate text-sm text-ink-500">{user?.email}</p>
+          <h1 className="truncate text-base font-black text-ink-900">{user?.username || 'Player'}</h1>
+          <p className="truncate text-xs text-ink-500">{user?.email}</p>
         </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold capitalize text-ink-500">
+        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-ink-500">
           {mode}
         </span>
+        <button
+          type="button"
+          onClick={handleLogout}
+          aria-label="Log out"
+          className="shrink-0 rounded-xl p-2 text-rose-500 transition-colors hover:bg-rose-50"
+        >
+          <LogOut className="size-4" />
+        </button>
       </Card>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid shrink-0 grid-cols-3 gap-2">
         <StatCard icon={Wallet} label="Balance" value={formatMoney(user?.wallet)} tone="brand" />
         <StatCard icon={User} label="Played" value={user?.gamesPlayed ?? 0} tone="sky" />
         <StatCard icon={Trophy} label="Wins" value={user?.wins ?? 0} tone="amber" />
       </div>
 
-      <Card className="p-5">
-        <div className="mb-4 flex items-center justify-between">
+      <Card className="shrink-0 p-3.5">
+        <div className="mb-3 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-900">
             <User className="size-4 text-ink-500" />
             Personal information
@@ -109,7 +116,7 @@ export function ProfilePage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2.5">
           <Input
             label="First name"
             value={form.firstName}
@@ -131,7 +138,6 @@ export function ProfilePage() {
             onChange={(event) => update('username')(event.target.value)}
             placeholder="—"
           />
-          <Input label="Email" value={user?.email || ''} disabled placeholder="—" />
           <Input
             label="Phone number"
             value={form.phoneNumber}
@@ -142,26 +148,28 @@ export function ProfilePage() {
         </div>
 
         {editing && (
-          <Button className="mt-4" loading={busy} onClick={save}>
+          <Button className="mt-3" size="sm" loading={busy} onClick={save}>
             <Save className="size-4" />
             Save changes
           </Button>
         )}
       </Card>
 
-      <Card className="p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-ink-900">
+      <Card className="shrink-0 p-3.5">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-900">
           <CreditCard className="size-4 text-ink-500" />
           Withdrawal details
         </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Input
-            label="Bank name"
-            value={form.bankName}
-            disabled={!editing}
-            onChange={(event) => update('bankName')(event.target.value)}
-            placeholder="—"
-          />
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="col-span-2">
+            <Input
+              label="Bank name"
+              value={form.bankName}
+              disabled={!editing}
+              onChange={(event) => update('bankName')(event.target.value)}
+              placeholder="—"
+            />
+          </div>
           <Input
             label="Account number"
             value={form.accountNumber}
@@ -180,10 +188,7 @@ export function ProfilePage() {
         </div>
       </Card>
 
-      <Button variant="danger" fullWidth onClick={handleLogout}>
-        <LogOut className="size-4" />
-        Log out
-      </Button>
+      <InstallPrompt className="shrink-0 lg:hidden" />
     </motion.div>
   );
 }

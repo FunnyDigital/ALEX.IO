@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 
 import { BetControls } from '../components/games/BetControls';
 import { GamePage } from '../components/games/GamePage';
-import { HistoryList } from '../components/games/HistoryList';
-import type { HistoryEntry } from '../components/games/HistoryList';
+import { RecentStrip } from '../components/games/RecentStrip';
+import type { HistoryEntry } from '../components/games/RecentStrip';
 import { ResultBanner } from '../components/games/ResultBanner';
 import type { ResultState } from '../components/games/ResultBanner';
 import { Button } from '../components/ui/Button';
@@ -29,7 +29,7 @@ function Die({ value, rolling }: { value: number; rolling: boolean }) {
     <motion.div
       animate={rolling ? { rotate: [0, -12, 12, 0] } : { rotate: 0 }}
       transition={{ duration: rolling ? 0.45 : 0.2, repeat: rolling ? Infinity : 0 }}
-      className="grid size-28 grid-cols-3 grid-rows-3 gap-1.5 rounded-3xl border-2 border-ink-100 bg-white p-4 shadow-card"
+      className="grid size-[clamp(72px,17vh,128px)] grid-cols-3 grid-rows-3 gap-1.5 rounded-3xl border-2 border-ink-100 bg-white p-3 shadow-card"
     >
       {Array.from({ length: 9 }, (_, index) => (
         <span
@@ -82,11 +82,7 @@ export function DiceRollPage() {
       ]);
       settle();
       setValue(Number(data.result));
-      setResult({
-        win: data.win,
-        profit: data.profit,
-        detail: `Rolled a ${data.result}`,
-      });
+      setResult({ win: data.win, profit: data.profit, detail: `Rolled a ${data.result}` });
       setBalance(data.wallet);
       setHistory((entries) =>
         [
@@ -97,7 +93,7 @@ export function DiceRollPage() {
             profit: data.profit,
           },
           ...entries,
-        ].slice(0, 5)
+        ].slice(0, 6)
       );
     } catch (error) {
       settle();
@@ -109,40 +105,38 @@ export function DiceRollPage() {
 
   return (
     <GamePage title="Dice Roll" subtitle="Guess the exact roll — win up to 5.88x." balance={balance}>
-      <Card className="flex flex-col items-center gap-6 p-6">
+      <Card className="flex min-h-0 flex-1 items-center justify-center p-4">
         <Die value={value} rolling={rolling} />
-
-        <div className="grid w-full grid-cols-3 gap-2">
-          {[1, 2, 3, 4, 5, 6].map((number) => (
-            <button
-              key={number}
-              type="button"
-              disabled={rolling}
-              onClick={() => setGuess(number)}
-              className={classNames(
-                'rounded-2xl border-2 py-3 text-lg font-black transition-colors disabled:opacity-60',
-                guess === number
-                  ? 'border-rose-400 bg-rose-50 text-rose-600'
-                  : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-              )}
-            >
-              {number}
-            </button>
-          ))}
-        </div>
-
-        <BetControls bet={bet} onChange={setBet} balance={balance} disabled={rolling} />
-
-        <Button size="lg" fullWidth loading={rolling} onClick={roll}>
-          {rolling ? 'Rolling…' : `Roll for ${guess}`}
-        </Button>
-
-        <div className="w-full">
-          <ResultBanner result={result} />
-        </div>
       </Card>
 
-      <HistoryList entries={history} />
+      <div className="grid shrink-0 grid-cols-6 gap-1.5">
+        {[1, 2, 3, 4, 5, 6].map((number) => (
+          <button
+            key={number}
+            type="button"
+            disabled={rolling}
+            onClick={() => setGuess(number)}
+            className={classNames(
+              'h-11 rounded-xl border-2 text-base font-black transition-colors disabled:opacity-60',
+              guess === number
+                ? 'border-rose-400 bg-rose-50 text-rose-600'
+                : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+            )}
+          >
+            {number}
+          </button>
+        ))}
+      </div>
+
+      <BetControls bet={bet} onChange={setBet} balance={balance} disabled={rolling} />
+
+      <Button size="lg" fullWidth loading={rolling} onClick={roll}>
+        {rolling ? 'Rolling…' : `Roll for ${guess}`}
+      </Button>
+
+      <ResultBanner result={result} className="h-14 shrink-0" />
+
+      <RecentStrip entries={history} />
     </GamePage>
   );
 }

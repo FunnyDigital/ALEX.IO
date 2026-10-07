@@ -3,8 +3,8 @@ import { TrendingDown, TrendingUp } from 'lucide-react';
 
 import { BetControls } from '../components/games/BetControls';
 import { GamePage } from '../components/games/GamePage';
-import { HistoryList } from '../components/games/HistoryList';
-import type { HistoryEntry } from '../components/games/HistoryList';
+import { RecentStrip } from '../components/games/RecentStrip';
+import type { HistoryEntry } from '../components/games/RecentStrip';
 import { ResultBanner } from '../components/games/ResultBanner';
 import type { ResultState } from '../components/games/ResultBanner';
 import { Button } from '../components/ui/Button';
@@ -99,7 +99,7 @@ export function TradeGamblePage() {
             profit: data.profit,
           },
           ...entries,
-        ].slice(0, 5)
+        ].slice(0, 6)
       );
     } catch (error) {
       toast(getErrorMessage(error), 'error');
@@ -122,17 +122,17 @@ export function TradeGamblePage() {
       subtitle="Pick a direction — win 1.90x if the market agrees."
       balance={balance}
     >
-      <Card className="space-y-5 p-6">
-        <div className="rounded-2xl border border-ink-100 bg-slate-50 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest text-ink-500">
-              ALEX/USD
-            </span>
-            <span className="text-xs font-semibold text-ink-500">
-              {trading ? 'Live…' : result ? (result.win ? 'Closed +' : 'Closed −') : 'Idle'}
-            </span>
-          </div>
-          <svg viewBox="0 0 300 100" className="mt-3 h-28 w-full" preserveAspectRatio="none">
+      <Card className="flex min-h-0 flex-1 flex-col p-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-ink-500">
+            ALEX/USD
+          </span>
+          <span className="text-[11px] font-semibold text-ink-500">
+            {trading ? 'Live…' : result ? (result.win ? 'Closed +' : 'Closed −') : 'Idle'}
+          </span>
+        </div>
+        <div className="mt-1 min-h-0 flex-1">
+          <svg viewBox="0 0 300 100" className="h-full w-full" preserveAspectRatio="none">
             <path
               d={toPath(points, 300, 100)}
               fill="none"
@@ -143,66 +143,61 @@ export function TradeGamblePage() {
             />
           </svg>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          {(['up', 'down'] as const).map((option) => {
-            const Icon = option === 'up' ? TrendingUp : TrendingDown;
-            return (
-              <button
-                key={option}
-                type="button"
-                disabled={trading}
-                onClick={() => setDirection(option)}
-                className={classNames(
-                  'flex items-center justify-center gap-2 rounded-2xl border-2 py-3 text-sm font-bold capitalize transition-colors disabled:opacity-60',
-                  direction === option
-                    ? option === 'up'
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-rose-400 bg-rose-50 text-rose-600'
-                    : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-                )}
-              >
-                <Icon className="size-4" />
-                {option}
-              </button>
-            );
-          })}
-        </div>
-
-        <div>
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-500">
-            Duration
-          </p>
-          <div className="flex gap-2">
-            {DURATIONS.map((seconds) => (
-              <button
-                key={seconds}
-                type="button"
-                disabled={trading}
-                onClick={() => setDuration(seconds)}
-                className={classNames(
-                  'flex-1 rounded-xl border py-2 text-sm font-bold transition-colors disabled:opacity-60',
-                  duration === seconds
-                    ? 'border-sky-400 bg-sky-50 text-sky-600'
-                    : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-                )}
-              >
-                {seconds}s
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <BetControls bet={bet} onChange={setBet} balance={balance} disabled={trading} />
-
-        <Button size="lg" fullWidth loading={trading} onClick={start}>
-          {trading ? 'Trading…' : `Go ${direction === 'up' ? 'long' : 'short'}`}
-        </Button>
-
-        <ResultBanner result={result} />
       </Card>
 
-      <HistoryList entries={history} />
+      <div className="grid shrink-0 grid-cols-2 gap-2">
+        {(['up', 'down'] as const).map((option) => {
+          const Icon = option === 'up' ? TrendingUp : TrendingDown;
+          return (
+            <button
+              key={option}
+              type="button"
+              disabled={trading}
+              onClick={() => setDirection(option)}
+              className={classNames(
+                'flex h-11 items-center justify-center gap-2 rounded-xl border-2 text-sm font-bold capitalize transition-colors disabled:opacity-60',
+                direction === option
+                  ? option === 'up'
+                    ? 'border-brand-500 bg-brand-50 text-brand-700'
+                    : 'border-rose-400 bg-rose-50 text-rose-600'
+                  : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+              )}
+            >
+              <Icon className="size-4" />
+              {option}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex shrink-0 gap-1.5">
+        {DURATIONS.map((seconds) => (
+          <button
+            key={seconds}
+            type="button"
+            disabled={trading}
+            onClick={() => setDuration(seconds)}
+            className={classNames(
+              'h-10 flex-1 rounded-xl border text-sm font-bold transition-colors disabled:opacity-60',
+              duration === seconds
+                ? 'border-sky-400 bg-sky-50 text-sky-600'
+                : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+            )}
+          >
+            {seconds}s
+          </button>
+        ))}
+      </div>
+
+      <BetControls bet={bet} onChange={setBet} balance={balance} disabled={trading} />
+
+      <Button size="lg" fullWidth loading={trading} onClick={start}>
+        {trading ? 'Trading…' : `Go ${direction === 'up' ? 'long' : 'short'}`}
+      </Button>
+
+      <ResultBanner result={result} className="h-14 shrink-0" />
+
+      <RecentStrip entries={history} />
     </GamePage>
   );
 }

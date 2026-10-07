@@ -21,8 +21,7 @@ export function InstallPrompt({ className }: { className?: string }) {
       /* ignore */
     }
 
-    const standalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (standalone) return;
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
 
     const handler = (event: Event) => {
       event.preventDefault();
@@ -51,23 +50,25 @@ export function InstallPrompt({ className }: { className?: string }) {
 
   return (
     <div
-      className={`relative rounded-2xl border border-brand-100 bg-brand-50 p-4 ${className ?? ''}`}
+      className={`flex items-center gap-2.5 rounded-2xl border border-brand-100 bg-brand-50 px-3 py-2.5 ${className ?? ''}`}
     >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
+        <Download className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-bold text-brand-800">Install ALEX.IO</p>
+        <p className="truncate text-[11px] text-brand-700/90">Add to your home screen</p>
+      </div>
+      <Button size="sm" className="shrink-0" onClick={install}>
+        Install
+      </Button>
       <button
         onClick={dismiss}
-        className="absolute right-2 top-2 rounded-lg p-1 text-brand-700/70 transition-colors hover:bg-brand-100"
+        className="shrink-0 rounded-lg p-1 text-brand-700/70 transition-colors hover:bg-brand-100"
         aria-label="Dismiss install prompt"
       >
         <X className="size-4" />
       </button>
-      <p className="pr-6 text-sm font-semibold text-brand-800">Install ALEX.IO</p>
-      <p className="mt-1 text-xs text-brand-700/90">
-        Add it to your home screen for a full-screen, app-like experience.
-      </p>
-      <Button size="sm" className="mt-3" onClick={install}>
-        <Download className="size-4" />
-        Install
-      </Button>
     </div>
   );
 }

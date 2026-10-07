@@ -21,14 +21,12 @@ export function StatCard({
   } as const;
 
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <span className={`flex size-10 items-center justify-center rounded-xl ${tones[tone]}`}>
-        <Icon className="size-5" />
+    <Card className="flex flex-col items-center gap-1 p-3 text-center">
+      <span className={`flex size-8 items-center justify-center rounded-lg ${tones[tone]}`}>
+        <Icon className="size-4" />
       </span>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</p>
-        <p className="truncate text-lg font-bold text-ink-900">{value}</p>
-      </div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500">{label}</p>
+      <p className="w-full truncate text-sm font-black text-ink-900">{value}</p>
     </Card>
   );
 }

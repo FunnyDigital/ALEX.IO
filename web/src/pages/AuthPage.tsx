@@ -54,7 +54,7 @@ export function AuthPage() {
   };
 
   return (
-    <div className="mx-auto grid min-h-dvh w-full max-w-5xl items-center gap-10 px-5 py-10 lg:grid-cols-2 lg:px-8">
+    <div className="mx-auto grid h-dvh w-full max-w-5xl items-center gap-10 overflow-y-auto px-5 py-10 lg:grid-cols-2 lg:px-8">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}

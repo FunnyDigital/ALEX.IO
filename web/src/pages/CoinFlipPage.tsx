@@ -4,8 +4,8 @@ import { Coins } from 'lucide-react';
 
 import { BetControls } from '../components/games/BetControls';
 import { GamePage } from '../components/games/GamePage';
-import { HistoryList } from '../components/games/HistoryList';
-import type { HistoryEntry } from '../components/games/HistoryList';
+import { RecentStrip } from '../components/games/RecentStrip';
+import type { HistoryEntry } from '../components/games/RecentStrip';
 import { ResultBanner } from '../components/games/ResultBanner';
 import type { ResultState } from '../components/games/ResultBanner';
 import { Button } from '../components/ui/Button';
@@ -59,7 +59,7 @@ export function CoinFlipPage() {
             profit: data.profit,
           },
           ...entries,
-        ].slice(0, 5)
+        ].slice(0, 6)
       );
     } catch (error) {
       toast(getErrorMessage(error), 'error');
@@ -70,52 +70,49 @@ export function CoinFlipPage() {
 
   return (
     <GamePage title="Coin Flip" subtitle="Call the toss — win 1.96x your bet." balance={balance}>
-      <Card className="flex flex-col items-center gap-6 p-6">
+      <Card className="flex min-h-0 flex-1 items-center justify-center p-4">
         <motion.div
           key={spinToken}
           animate={spinning ? { rotateY: [0, 1080] } : { rotateY: 0 }}
           transition={{ duration: spinning ? 1 : 0.3, ease: 'easeInOut' }}
-          className="flex size-32 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-float"
-          style={{ transformStyle: 'preserve-3d' }}
+          className="flex size-[clamp(84px,20vh,168px)] items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-float"
         >
           {face ? (
             <span className="text-3xl font-black uppercase">{face === 'heads' ? 'H' : 'T'}</span>
           ) : (
-            <Coins className="size-12" />
+            <Coins className="size-10" />
           )}
         </motion.div>
-
-        <div className="grid w-full grid-cols-2 gap-3">
-          {CHOICES.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              disabled={spinning}
-              onClick={() => setChoice(option.key)}
-              className={classNames(
-                'rounded-2xl border-2 px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60',
-                choice === option.key
-                  ? 'border-brand-500 bg-brand-50 text-brand-700'
-                  : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        <BetControls bet={bet} onChange={setBet} balance={balance} disabled={spinning} />
-
-        <Button size="lg" fullWidth loading={spinning} onClick={flip}>
-          {spinning ? 'Flipping…' : 'Flip coin'}
-        </Button>
-
-        <div className="w-full">
-          <ResultBanner result={result} />
-        </div>
       </Card>
 
-      <HistoryList entries={history} />
+      <div className="grid shrink-0 grid-cols-2 gap-2">
+        {CHOICES.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            disabled={spinning}
+            onClick={() => setChoice(option.key)}
+            className={classNames(
+              'h-11 rounded-xl border-2 text-sm font-bold transition-colors disabled:opacity-60',
+              choice === option.key
+                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <BetControls bet={bet} onChange={setBet} balance={balance} disabled={spinning} />
+
+      <Button size="lg" fullWidth loading={spinning} onClick={flip}>
+        {spinning ? 'Flipping…' : 'Flip coin'}
+      </Button>
+
+      <ResultBanner result={result} className="h-14 shrink-0" />
+
+      <RecentStrip entries={history} />
     </GamePage>
   );
 }

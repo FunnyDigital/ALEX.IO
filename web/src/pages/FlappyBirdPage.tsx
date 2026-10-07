@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { GamePage } from '../components/games/GamePage';
-import { BetControls } from '../components/games/BetControls';
 import { ResultBanner } from '../components/games/ResultBanner';
 import type { ResultState } from '../components/games/ResultBanner';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
 import { useToast } from '../hooks/useToast';
 import { useWallet } from '../hooks/useWallet';
 import { apiService, getErrorMessage } from '../lib/api';
@@ -29,7 +27,12 @@ interface Pipe {
   gapY: number;
 }
 
-function draw(ctx: CanvasRenderingContext2D, bird: { y: number; vy: number }, pipes: Pipe[], flash: boolean) {
+function draw(
+  ctx: CanvasRenderingContext2D,
+  bird: { y: number; vy: number },
+  pipes: Pipe[],
+  flash: boolean
+) {
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, '#e6fbf2');
   sky.addColorStop(1, '#f8fafc');
@@ -89,6 +92,7 @@ export function FlappyBirdPage() {
   const { balance, setBalance } = useWallet();
   const { toast } = useToast();
 
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const birdRef = useRef({ y: H / 2, vy: 0 });
   const pipesRef = useRef<Pipe[]>([]);
@@ -99,11 +103,28 @@ export function FlappyBirdPage() {
   const paramsRef = useRef({ bet: 0, timeTarget: 0 });
   const phaseRef = useRef<'ready' | 'playing' | 'done'>('ready');
 
+  const [size, setSize] = useState({ w: 240, h: 373 });
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
   const [bet, setBet] = useState('100');
   const [target, setTarget] = useState(30);
   const [remaining, setRemaining] = useState(30);
   const [result, setResult] = useState<ResultState | null>(null);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      const cw = el.clientWidth;
+      const ch = el.clientHeight;
+      if (!cw || !ch) return;
+      const scale = Math.min(cw / W, ch / H);
+      setSize({ w: Math.floor(W * scale), h: Math.floor(H * scale) });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const stopLoop = useCallback(() => {
     if (rafRef.current !== null) {
@@ -192,10 +213,7 @@ export function FlappyBirdPage() {
 
       const lastPipe = pipesRef.current[pipesRef.current.length - 1];
       if (!lastPipe || lastPipe.x <= W - PIPE_SPACING) {
-        pipesRef.current.push({
-          x: W,
-          gapY: 120 + Math.random() * (H - 260),
-        });
+        pipesRef.current.push({ x: W, gapY: 120 + Math.random() * (H - 260) });
       }
 
       for (const pipe of pipesRef.current) {
@@ -245,75 +263,96 @@ export function FlappyBirdPage() {
   useEffect(() => stopLoop, [stopLoop]);
 
   return (
-    <GamePage
-      title="Flappy Flight"
-      subtitle="Survive the target time to win 1.96x. Tap or press space to fly."
-      balance={balance}
-    >
-      <Card className="overflow-hidden p-0">
-        <div
-          className="relative mx-auto w-full max-w-md cursor-pointer select-none"
-          onClick={flap}
-          role="presentation"
-        >
+    <GamePage title="Flappy Flight" subtitle="Tap the canvas or press space to fly." balance={balance}>
+      <div ref={wrapRef} className="flex min-h-0 flex-1 items-center justify-center">
+        <div className="relative" style={{ width: size.w, height: size.h }}>
           <canvas
             ref={canvasRef}
-            style={{ width: '100%', aspectRatio: `${W} / ${H}` }}
-            className="block touch-none"
+            style={{ width: size.w, height: size.h }}
+            className="block touch-none rounded-2xl shadow-card"
+            onClick={flap}
+            role="presentation"
           />
 
           {phase === 'playing' && (
-            <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-              <span className="rounded-full bg-white/85 px-3 py-1 text-sm font-bold text-ink-900 shadow-sm">
+            <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
+              <span className="rounded-full bg-white/85 px-3 py-1 text-xs font-bold text-ink-900 shadow-sm">
                 {remaining.toFixed(1)}s left
               </span>
             </div>
           )}
 
           {phase !== 'playing' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/70 backdrop-blur-sm">
-              <p className="text-lg font-black text-ink-900">
+            <button
+              type="button"
+              onClick={start}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-2xl bg-white/75 px-4 text-center backdrop-blur-sm"
+            >
+              <span className="text-base font-black text-ink-900">
                 {phase === 'ready' ? 'Ready to fly?' : result?.win ? 'You survived!' : 'Crashed'}
-              </p>
-              <p className="text-sm text-ink-500">Tap the canvas or press space to flap.</p>
-            </div>
+              </span>
+              <span className="text-xs text-ink-500">
+                {phase === 'ready' ? 'Tap to start' : 'Tap to play again'}
+              </span>
+            </button>
           )}
         </div>
-      </Card>
+      </div>
 
-      <Card className="space-y-5 p-6">
-        <div>
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-ink-500">
-            Target time
-          </p>
-          <div className="flex gap-2">
-            {TARGETS.map((seconds) => (
-              <button
-                key={seconds}
-                type="button"
-                disabled={phase === 'playing'}
-                onClick={() => setTarget(seconds)}
-                className={classNames(
-                  'flex-1 rounded-xl border py-2 text-sm font-bold transition-colors disabled:opacity-60',
-                  target === seconds
-                    ? 'border-brand-500 bg-brand-50 text-brand-700'
-                    : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-                )}
-              >
-                {seconds}s
-              </button>
-            ))}
-          </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <span className="w-12 shrink-0 text-[11px] font-bold uppercase tracking-wide text-ink-500">
+          Target
+        </span>
+        {TARGETS.map((seconds) => (
+          <button
+            key={seconds}
+            type="button"
+            disabled={phase === 'playing'}
+            onClick={() => setTarget(seconds)}
+            className={classNames(
+              'h-10 flex-1 rounded-xl border text-sm font-bold transition-colors disabled:opacity-60',
+              target === seconds
+                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+            )}
+          >
+            {seconds}s
+          </button>
+        ))}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        <div className="relative min-w-0 flex-1">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-500">
+            ₦
+          </span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={10}
+            value={bet}
+            disabled={phase === 'playing'}
+            onChange={(event) => setBet(event.target.value)}
+            placeholder="Bet"
+            aria-label="Bet amount"
+            className="h-11 w-full rounded-xl border border-ink-100 bg-white pl-7 pr-3 text-sm font-semibold text-ink-900 outline-none transition-colors placeholder:text-ink-300 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
+          />
         </div>
-
-        <BetControls bet={bet} onChange={setBet} balance={balance} disabled={phase === 'playing'} />
-
-        <Button size="lg" fullWidth onClick={start} disabled={phase === 'playing'}>
-          {phase === 'playing' ? 'Fly!' : phase === 'ready' ? 'Start flight' : 'Play again'}
+        <button
+          type="button"
+          disabled={phase === 'playing'}
+          onClick={() => setBet(String(Math.floor(balance)))}
+          className="h-11 shrink-0 rounded-xl border border-ink-100 bg-white px-2.5 text-xs font-bold text-ink-700 transition-colors hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+        >
+          Max
+        </button>
+        <Button className="h-11 shrink-0 px-5" disabled={phase === 'playing'} onClick={start}>
+          {phase === 'playing' ? 'Flying…' : 'Start'}
         </Button>
+      </div>
 
-        <ResultBanner result={result} />
-      </Card>
+      <ResultBanner result={result} className="h-14 shrink-0" />
     </GamePage>
   );
 }

@@ -18,26 +18,28 @@ export function GamePage({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="space-y-5"
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="flex min-h-0 flex-1 flex-col gap-2.5"
     >
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          to="/games"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-500 transition-colors hover:text-ink-900"
-        >
-          <ArrowLeft className="size-4" />
-          Games
-        </Link>
+      <div className="flex shrink-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Link
+            to="/games"
+            className="flex size-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-slate-100 hover:text-ink-900"
+            aria-label="Back to games"
+          >
+            <ArrowLeft className="size-4" />
+          </Link>
+          <h1 className="truncate text-lg font-black tracking-tight text-ink-900">{title}</h1>
+        </div>
         <BalanceBadge balance={balance} />
       </div>
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-ink-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
-      </div>
-      {children}
+
+      {subtitle && <p className="shrink-0 text-xs text-ink-500">{subtitle}</p>}
+
+      <div className="flex min-h-0 flex-1 flex-col gap-3">{children}</div>
     </motion.div>
   );
 }

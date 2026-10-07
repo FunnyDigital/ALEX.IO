@@ -17,23 +17,24 @@ export function GameCard({ game, index }: { game: GameMeta; index: number }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.3, ease: 'easeOut' }}
+      transition={{ delay: index * 0.05, duration: 0.28, ease: 'easeOut' }}
+      className="min-h-0"
     >
       <Link
         to={`/games/${game.slug}`}
-        className={`group flex h-full flex-col justify-between rounded-3xl border border-ink-100 ${game.tint} p-5 shadow-card transition-transform duration-200 hover:-translate-y-0.5`}
+        className={`group flex h-full flex-col justify-between rounded-3xl border border-ink-100 ${game.tint} p-4 shadow-card transition-transform duration-200 hover:-translate-y-0.5`}
       >
         <div className="flex items-start justify-between">
-          <span className={`flex size-12 items-center justify-center rounded-2xl ${game.iconBg}`}>
-            <Icon className="size-6" />
+          <span className={`flex size-10 items-center justify-center rounded-2xl ${game.iconBg}`}>
+            <Icon className="size-5" />
           </span>
-          <ArrowRight className="size-5 text-ink-300 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-ink-500" />
+          <ArrowRight className="size-4 text-ink-300 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-ink-500" />
         </div>
-        <div className="mt-5">
-          <h3 className="text-base font-bold text-ink-900">{game.name}</h3>
-          <p className="mt-0.5 text-sm text-ink-500">{game.tagline}</p>
+        <div className="mt-3">
+          <h3 className="text-sm font-bold text-ink-900">{game.name}</h3>
+          <p className="mt-0.5 text-xs leading-snug text-ink-500">{game.tagline}</p>
         </div>
       </Link>
     </motion.div>
