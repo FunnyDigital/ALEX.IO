@@ -121,6 +121,63 @@ export function TradeGamblePage() {
       title="Trade Gamble"
       subtitle="Pick a direction — win 1.90x if the market agrees."
       balance={balance}
+      controls={
+        <>
+          <div className="grid shrink-0 grid-cols-2 gap-2">
+            {(['up', 'down'] as const).map((option) => {
+              const Icon = option === 'up' ? TrendingUp : TrendingDown;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  disabled={trading}
+                  onClick={() => setDirection(option)}
+                  className={classNames(
+                    'flex h-11 items-center justify-center gap-2 rounded-xl border-2 text-sm font-bold capitalize transition-colors disabled:opacity-60',
+                    direction === option
+                      ? option === 'up'
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-rose-400 bg-rose-50 text-rose-600'
+                      : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+                  )}
+                >
+                  <Icon className="size-4" />
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex shrink-0 gap-1.5">
+            {DURATIONS.map((seconds) => (
+              <button
+                key={seconds}
+                type="button"
+                disabled={trading}
+                onClick={() => setDuration(seconds)}
+                className={classNames(
+                  'h-10 flex-1 rounded-xl border text-sm font-bold transition-colors disabled:opacity-60',
+                  duration === seconds
+                    ? 'border-sky-400 bg-sky-50 text-sky-600'
+                    : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+                )}
+              >
+                {seconds}s
+              </button>
+            ))}
+          </div>
+
+          <BetControls bet={bet} onChange={setBet} balance={balance} disabled={trading} />
+
+          <Button size="lg" fullWidth loading={trading} onClick={start}>
+            {trading ? 'Trading…' : `Go ${direction === 'up' ? 'long' : 'short'}`}
+          </Button>
+
+          <ResultBanner result={result} className="h-14 shrink-0" />
+
+          <RecentStrip entries={history} />
+        </>
+      }
     >
       <Card className="flex min-h-0 flex-1 flex-col p-3">
         <div className="flex items-center justify-between">
@@ -144,60 +201,6 @@ export function TradeGamblePage() {
           </svg>
         </div>
       </Card>
-
-      <div className="grid shrink-0 grid-cols-2 gap-2">
-        {(['up', 'down'] as const).map((option) => {
-          const Icon = option === 'up' ? TrendingUp : TrendingDown;
-          return (
-            <button
-              key={option}
-              type="button"
-              disabled={trading}
-              onClick={() => setDirection(option)}
-              className={classNames(
-                'flex h-11 items-center justify-center gap-2 rounded-xl border-2 text-sm font-bold capitalize transition-colors disabled:opacity-60',
-                direction === option
-                  ? option === 'up'
-                    ? 'border-brand-500 bg-brand-50 text-brand-700'
-                    : 'border-rose-400 bg-rose-50 text-rose-600'
-                  : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-              )}
-            >
-              <Icon className="size-4" />
-              {option}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex shrink-0 gap-1.5">
-        {DURATIONS.map((seconds) => (
-          <button
-            key={seconds}
-            type="button"
-            disabled={trading}
-            onClick={() => setDuration(seconds)}
-            className={classNames(
-              'h-10 flex-1 rounded-xl border text-sm font-bold transition-colors disabled:opacity-60',
-              duration === seconds
-                ? 'border-sky-400 bg-sky-50 text-sky-600'
-                : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-            )}
-          >
-            {seconds}s
-          </button>
-        ))}
-      </div>
-
-      <BetControls bet={bet} onChange={setBet} balance={balance} disabled={trading} />
-
-      <Button size="lg" fullWidth loading={trading} onClick={start}>
-        {trading ? 'Trading…' : `Go ${direction === 'up' ? 'long' : 'short'}`}
-      </Button>
-
-      <ResultBanner result={result} className="h-14 shrink-0" />
-
-      <RecentStrip entries={history} />
     </GamePage>
   );
 }

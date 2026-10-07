@@ -263,7 +263,69 @@ export function FlappyBirdPage() {
   useEffect(() => stopLoop, [stopLoop]);
 
   return (
-    <GamePage title="Flappy Flight" subtitle="Tap the canvas or press space to fly." balance={balance}>
+    <GamePage
+      title="Flappy Flight"
+      subtitle="Tap the canvas or press space to fly."
+      balance={balance}
+      controls={
+        <>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="w-12 shrink-0 text-[11px] font-bold uppercase tracking-wide text-ink-500">
+              Target
+            </span>
+            {TARGETS.map((seconds) => (
+              <button
+                key={seconds}
+                type="button"
+                disabled={phase === 'playing'}
+                onClick={() => setTarget(seconds)}
+                className={classNames(
+                  'h-10 flex-1 rounded-xl border text-sm font-bold transition-colors disabled:opacity-60',
+                  target === seconds
+                    ? 'border-brand-500 bg-brand-50 text-brand-700'
+                    : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+                )}
+              >
+                {seconds}s
+              </button>
+            ))}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="relative min-w-0 flex-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-500">
+                ₦
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={10}
+                value={bet}
+                disabled={phase === 'playing'}
+                onChange={(event) => setBet(event.target.value)}
+                placeholder="Bet"
+                aria-label="Bet amount"
+                className="h-11 w-full rounded-xl border border-ink-100 bg-white pl-7 pr-3 text-sm font-semibold text-ink-900 outline-none transition-colors placeholder:text-ink-300 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={phase === 'playing'}
+              onClick={() => setBet(String(Math.floor(balance)))}
+              className="h-11 shrink-0 rounded-xl border border-ink-100 bg-white px-2.5 text-xs font-bold text-ink-700 transition-colors hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+            >
+              Max
+            </button>
+            <Button className="h-11 shrink-0 px-5" disabled={phase === 'playing'} onClick={start}>
+              {phase === 'playing' ? 'Flying…' : 'Start'}
+            </Button>
+          </div>
+
+          <ResultBanner result={result} className="h-14 shrink-0" />
+        </>
+      }
+    >
       <div ref={wrapRef} className="flex min-h-0 flex-1 items-center justify-center">
         <div className="relative" style={{ width: size.w, height: size.h }}>
           <canvas
@@ -299,60 +361,6 @@ export function FlappyBirdPage() {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
-        <span className="w-12 shrink-0 text-[11px] font-bold uppercase tracking-wide text-ink-500">
-          Target
-        </span>
-        {TARGETS.map((seconds) => (
-          <button
-            key={seconds}
-            type="button"
-            disabled={phase === 'playing'}
-            onClick={() => setTarget(seconds)}
-            className={classNames(
-              'h-10 flex-1 rounded-xl border text-sm font-bold transition-colors disabled:opacity-60',
-              target === seconds
-                ? 'border-brand-500 bg-brand-50 text-brand-700'
-                : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-            )}
-          >
-            {seconds}s
-          </button>
-        ))}
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1.5">
-        <div className="relative min-w-0 flex-1">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-500">
-            ₦
-          </span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            step={10}
-            value={bet}
-            disabled={phase === 'playing'}
-            onChange={(event) => setBet(event.target.value)}
-            placeholder="Bet"
-            aria-label="Bet amount"
-            className="h-11 w-full rounded-xl border border-ink-100 bg-white pl-7 pr-3 text-sm font-semibold text-ink-900 outline-none transition-colors placeholder:text-ink-300 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
-          />
-        </div>
-        <button
-          type="button"
-          disabled={phase === 'playing'}
-          onClick={() => setBet(String(Math.floor(balance)))}
-          className="h-11 shrink-0 rounded-xl border border-ink-100 bg-white px-2.5 text-xs font-bold text-ink-700 transition-colors hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
-        >
-          Max
-        </button>
-        <Button className="h-11 shrink-0 px-5" disabled={phase === 'playing'} onClick={start}>
-          {phase === 'playing' ? 'Flying…' : 'Start'}
-        </Button>
-      </div>
-
-      <ResultBanner result={result} className="h-14 shrink-0" />
     </GamePage>
   );
 }

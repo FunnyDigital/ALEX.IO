@@ -29,7 +29,7 @@ function Die({ value, rolling }: { value: number; rolling: boolean }) {
     <motion.div
       animate={rolling ? { rotate: [0, -12, 12, 0] } : { rotate: 0 }}
       transition={{ duration: rolling ? 0.45 : 0.2, repeat: rolling ? Infinity : 0 }}
-      className="grid size-[clamp(72px,17vh,128px)] grid-cols-3 grid-rows-3 gap-1.5 rounded-3xl border-2 border-ink-100 bg-white p-3 shadow-card"
+      className="grid size-[min(34vh,12rem)] max-h-full grid-cols-3 grid-rows-3 gap-1.5 rounded-3xl border-2 border-ink-100 bg-white p-3 shadow-card"
     >
       {Array.from({ length: 9 }, (_, index) => (
         <span
@@ -104,39 +104,46 @@ export function DiceRollPage() {
   };
 
   return (
-    <GamePage title="Dice Roll" subtitle="Guess the exact roll — win up to 5.88x." balance={balance}>
+    <GamePage
+      title="Dice Roll"
+      subtitle="Guess the exact roll — win up to 5.88x."
+      balance={balance}
+      controls={
+        <>
+          <div className="grid shrink-0 grid-cols-6 gap-1.5">
+            {[1, 2, 3, 4, 5, 6].map((number) => (
+              <button
+                key={number}
+                type="button"
+                disabled={rolling}
+                onClick={() => setGuess(number)}
+                className={classNames(
+                  'h-11 rounded-xl border-2 text-base font-black transition-colors disabled:opacity-60',
+                  guess === number
+                    ? 'border-rose-400 bg-rose-50 text-rose-600'
+                    : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
+                )}
+              >
+                {number}
+              </button>
+            ))}
+          </div>
+
+          <BetControls bet={bet} onChange={setBet} balance={balance} disabled={rolling} />
+
+          <Button size="lg" fullWidth loading={rolling} onClick={roll}>
+            {rolling ? 'Rolling…' : `Roll for ${guess}`}
+          </Button>
+
+          <ResultBanner result={result} className="h-14 shrink-0" />
+
+          <RecentStrip entries={history} />
+        </>
+      }
+    >
       <Card className="flex min-h-0 flex-1 items-center justify-center p-4">
         <Die value={value} rolling={rolling} />
       </Card>
-
-      <div className="grid shrink-0 grid-cols-6 gap-1.5">
-        {[1, 2, 3, 4, 5, 6].map((number) => (
-          <button
-            key={number}
-            type="button"
-            disabled={rolling}
-            onClick={() => setGuess(number)}
-            className={classNames(
-              'h-11 rounded-xl border-2 text-base font-black transition-colors disabled:opacity-60',
-              guess === number
-                ? 'border-rose-400 bg-rose-50 text-rose-600'
-                : 'border-ink-100 bg-white text-ink-500 hover:border-ink-300'
-            )}
-          >
-            {number}
-          </button>
-        ))}
-      </div>
-
-      <BetControls bet={bet} onChange={setBet} balance={balance} disabled={rolling} />
-
-      <Button size="lg" fullWidth loading={rolling} onClick={roll}>
-        {rolling ? 'Rolling…' : `Roll for ${guess}`}
-      </Button>
-
-      <ResultBanner result={result} className="h-14 shrink-0" />
-
-      <RecentStrip entries={history} />
     </GamePage>
   );
 }
